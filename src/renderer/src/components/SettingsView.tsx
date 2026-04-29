@@ -58,6 +58,22 @@ export function SettingsView(): JSX.Element {
         <h1>{labels.title}</h1>
       </header>
 
+      {!draft.onboardingDismissed ? (
+        <section className="onboarding-card">
+          <div>
+            <h2>{labels.welcomeTitle}</h2>
+            <p>{labels.welcomeCopy}</p>
+          </div>
+          <button
+            className="secondary-action"
+            type="button"
+            onClick={() => updateDraft({ onboardingDismissed: true })}
+          >
+            {labels.dismissWelcome}
+          </button>
+        </section>
+      ) : null}
+
       <section className="settings-section">
         <SelectField
           label={labels.language}

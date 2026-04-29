@@ -210,6 +210,23 @@ h2 {
   padding: 18px 0;
 }
 
+.onboarding-card {
+  background: #f4eadb;
+  border: 1px solid rgba(45, 38, 31, 0.12);
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 16px;
+}
+
+.onboarding-card p {
+  color: #5f5348;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 8px 0 0;
+}
+
 .disclosure-button {
   align-items: center;
   background: transparent;

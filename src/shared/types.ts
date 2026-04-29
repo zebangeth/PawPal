@@ -36,6 +36,7 @@ export type BlockingMode = "break" | "breakRun" | "hydration" | "focusWarning" |
 export type Settings = {
   language: Language;
   petAppearanceId: PetAppearanceId;
+  onboardingDismissed: boolean;
   breakReminderEnabled: boolean;
   breakIntervalMinutes: number;
   hydrationReminderEnabled: boolean;
