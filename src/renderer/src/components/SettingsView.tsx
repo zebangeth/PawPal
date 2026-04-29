@@ -26,6 +26,7 @@ export function SettingsView(): JSX.Element {
   const { settings, stats } = snapshot;
   const [draft, setDraft] = useState(settings);
   const [settingsDirty, setSettingsDirty] = useState(false);
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const now = useNow();
   const savedSettingsKey = JSON.stringify(settings);
   const language = resolveLanguage(draft.language);
@@ -36,14 +37,18 @@ export function SettingsView(): JSX.Element {
     setSettingsDirty(false);
   }, [savedSettingsKey, settings]);
 
+  useEffect(() => {
+    if (!settingsDirty) return;
+    const timer = window.setTimeout(() => {
+      window.pawse.updateSettings(draft);
+      setSettingsDirty(false);
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [draft, settingsDirty]);
+
   function updateDraft(partial: Partial<Settings>): void {
     setDraft((current) => ({ ...current, ...partial }));
     setSettingsDirty(true);
-  }
-
-  function save(): void {
-    window.pawse.updateSettings(draft);
-    setSettingsDirty(false);
   }
 
   return (
@@ -157,78 +162,86 @@ export function SettingsView(): JSX.Element {
       </section>
 
       <section className="settings-section">
-        <h2>{labels.runtime}</h2>
-        <dl className="runtime-grid">
-          <div>
-            <dt>{labels.state}</dt>
-            <dd>{snapshot.petState}</dd>
-          </div>
-          <div>
-            <dt>{labels.mode}</dt>
-            <dd>{snapshot.focusActive ? labels.focus : snapshot.petParked ? labels.parked : labels.walking}</dd>
-          </div>
-          <div>
-            <dt>{labels.reminder}</dt>
-            <dd>{snapshot.blockingMode ?? labels.none}</dd>
-          </div>
-          <div>
-            <dt>{labels.dog}</dt>
-            <dd>{snapshot.dogVisible ? labels.visible : labels.hidden}</dd>
-          </div>
-        </dl>
-      </section>
+        <button
+          className="disclosure-button"
+          type="button"
+          onClick={() => setDiagnosticsOpen((current) => !current)}
+        >
+          <span>{labels.diagnostics}</span>
+          <span>{diagnosticsOpen ? "−" : "+"}</span>
+        </button>
+        {diagnosticsOpen ? (
+          <div className="diagnostics-panel">
+            <h2>{labels.runtime}</h2>
+            <dl className="runtime-grid">
+              <div>
+                <dt>{labels.state}</dt>
+                <dd>{snapshot.petState}</dd>
+              </div>
+              <div>
+                <dt>{labels.mode}</dt>
+                <dd>{snapshot.focusActive ? labels.focus : snapshot.petParked ? labels.parked : labels.walking}</dd>
+              </div>
+              <div>
+                <dt>{labels.reminder}</dt>
+                <dd>{snapshot.blockingMode ?? labels.none}</dd>
+              </div>
+              <div>
+                <dt>{labels.dog}</dt>
+                <dd>{snapshot.dogVisible ? labels.visible : labels.hidden}</dd>
+              </div>
+            </dl>
 
-      <section className="settings-section">
-        <h2>{labels.distraction}</h2>
-        <dl className="runtime-grid">
-          <div>
-            <dt>{labels.status}</dt>
-            <dd>{snapshot.distraction.state}</dd>
-          </div>
-          <div>
-            <dt>{labels.matched}</dt>
-            <dd>{snapshot.distraction.matchedRule ?? labels.none}</dd>
-          </div>
-          <div>
-            <dt>{labels.app}</dt>
-            <dd>{snapshot.distraction.activeApp || labels.none}</dd>
-          </div>
-          <div>
-            <dt>{labels.checked}</dt>
-            <dd>{formatTimestamp(snapshot.distraction.lastCheckedAt, language, labels)}</dd>
-          </div>
-        </dl>
-        <p className="diagnostic-copy">
-          {snapshot.distraction.activeWindowTitle || labels.noActiveWindowTitle}
-        </p>
-        <p className="diagnostic-copy warning-copy">{distractionHelp(snapshot, labels)}</p>
-      </section>
+            <h2>{labels.distraction}</h2>
+            <dl className="runtime-grid">
+              <div>
+                <dt>{labels.status}</dt>
+                <dd>{snapshot.distraction.state}</dd>
+              </div>
+              <div>
+                <dt>{labels.matched}</dt>
+                <dd>{snapshot.distraction.matchedRule ?? labels.none}</dd>
+              </div>
+              <div>
+                <dt>{labels.app}</dt>
+                <dd>{snapshot.distraction.activeApp || labels.none}</dd>
+              </div>
+              <div>
+                <dt>{labels.checked}</dt>
+                <dd>{formatTimestamp(snapshot.distraction.lastCheckedAt, language, labels)}</dd>
+              </div>
+            </dl>
+            <p className="diagnostic-copy">
+              {snapshot.distraction.activeWindowTitle || labels.noActiveWindowTitle}
+            </p>
+            <p className="diagnostic-copy warning-copy">{distractionHelp(snapshot, labels)}</p>
 
-      <section className="settings-section">
-        <h2>{labels.timers}</h2>
-        <dl className="runtime-grid">
-          <div>
-            <dt>{labels.break}</dt>
-            <dd>{formatTimer(snapshot.timers.breakDueAt, now, language, labels)}</dd>
+            <h2>{labels.timers}</h2>
+            <dl className="runtime-grid">
+              <div>
+                <dt>{labels.break}</dt>
+                <dd>{formatTimer(snapshot.timers.breakDueAt, now, language, labels)}</dd>
+              </div>
+              <div>
+                <dt>{labels.water}</dt>
+                <dd>{formatTimer(snapshot.timers.hydrationDueAt, now, language, labels)}</dd>
+              </div>
+              <div>
+                <dt>{labels.focusEnd}</dt>
+                <dd>{formatTimer(snapshot.timers.focusEndsAt, now, language, labels)}</dd>
+              </div>
+              <div>
+                <dt>{labels.updated}</dt>
+                <dd>
+                  {new Intl.DateTimeFormat(localeFor(language), {
+                    hour: "2-digit",
+                    minute: "2-digit"
+                  }).format(now)}
+                </dd>
+              </div>
+            </dl>
           </div>
-          <div>
-            <dt>{labels.water}</dt>
-            <dd>{formatTimer(snapshot.timers.hydrationDueAt, now, language, labels)}</dd>
-          </div>
-          <div>
-            <dt>{labels.focusEnd}</dt>
-            <dd>{formatTimer(snapshot.timers.focusEndsAt, now, language, labels)}</dd>
-          </div>
-          <div>
-            <dt>{labels.updated}</dt>
-            <dd>
-              {new Intl.DateTimeFormat(localeFor(language), {
-                hour: "2-digit",
-                minute: "2-digit"
-              }).format(now)}
-            </dd>
-          </div>
-        </dl>
+        ) : null}
       </section>
 
       <section className="settings-section">
@@ -254,9 +267,9 @@ export function SettingsView(): JSX.Element {
         <button className="secondary-action" type="button" onClick={window.pawse.resumeWalking}>
           {labels.resumeWalk}
         </button>
-        <button className="primary-action" type="button" disabled={!settingsDirty} onClick={save}>
-          {labels.save}
-        </button>
+        <div className="save-status" aria-live="polite">
+          {settingsDirty ? labels.saving : labels.autoSaved}
+        </div>
       </footer>
     </main>
   );

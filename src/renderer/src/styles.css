@@ -210,6 +210,36 @@ h2 {
   padding: 18px 0;
 }
 
+.disclosure-button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: #2d261f;
+  cursor: pointer;
+  display: flex;
+  font-weight: 750;
+  justify-content: space-between;
+  min-height: 36px;
+  padding: 0;
+  width: 100%;
+}
+
+.disclosure-button span:last-child {
+  color: #557267;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.diagnostics-panel {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.diagnostics-panel h2 {
+  margin-bottom: 0;
+}
+
 .diagnostic-copy {
   color: #6f6256;
   font-size: 14px;
@@ -346,6 +376,16 @@ h2 {
   gap: 8px;
   grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   padding-top: 4px;
+}
+
+.save-status {
+  align-items: center;
+  color: #557267;
+  display: flex;
+  font-size: 13px;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 36px;
 }
 
 @keyframes pet-bob {

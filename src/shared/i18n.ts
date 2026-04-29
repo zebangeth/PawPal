@@ -98,6 +98,9 @@ export const I18N = {
       stopFocus: "停止专注",
       resumeWalk: "继续巡逻",
       save: "保存",
+      autoSaved: "已自动保存",
+      saving: "正在保存...",
+      diagnostics: "诊断信息",
       preloadUnavailable: "Preload 不可用",
       preloadCopy:
         "Electron preload 没有注入，桌宠控制接口暂时不可用。请重启 pnpm dev，或检查 preload 路径和 sandbox 设置。",
@@ -207,6 +210,9 @@ export const I18N = {
       stopFocus: "Stop Focus",
       resumeWalk: "Resume Walk",
       save: "Save",
+      autoSaved: "Auto-saved",
+      saving: "Saving...",
+      diagnostics: "Diagnostics",
       preloadUnavailable: "Preload unavailable",
       preloadCopy:
         "Electron preload was not injected, so the pet control API is unavailable. Restart pnpm dev, or check the preload path and sandbox settings.",
