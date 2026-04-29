@@ -10,6 +10,7 @@ import {
 } from "../shared/constants";
 import type {
   AppSnapshot,
+  BlockingMode,
   DemoTrigger,
   PetState,
   Settings,
@@ -17,12 +18,17 @@ import type {
   TodayStats
 } from "../shared/types";
 
+type PetPosition = {
+  x: number;
+  y: number;
+};
+
 type StoreSchema = {
   settings: Settings;
   stats: TodayStats;
+  petPosition?: PetPosition;
+  petParked: boolean;
 };
-
-type BlockingMode = "break" | "hydration" | "focusWarning" | null;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -39,14 +45,16 @@ const store = new Store<StoreSchema>({
   name: "pawse-demo",
   defaults: {
     settings: DEFAULT_SETTINGS,
-    stats: createEmptyStats()
+    stats: createEmptyStats(),
+    petParked: false
   }
 });
 
 let petWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
-let petState: PetState = "walking";
+let petParked = store.get("petParked", false);
+let petState: PetState = petParked ? "sitting" : "walking";
 let blockingMode: BlockingMode = null;
 let focusActive = false;
 let focusStartedAt: number | null = null;
@@ -56,8 +64,10 @@ let hydrationTimer: NodeJS.Timeout | null = null;
 let focusTimer: NodeJS.Timeout | null = null;
 let idleTimer: NodeJS.Timeout | null = null;
 let bubbleTimer: NodeJS.Timeout | null = null;
+let dragTimer: NodeJS.Timeout | null = null;
 let walkDirection: 1 | -1 = 1;
 let breakMutedToday = false;
+let dragOffset: PetPosition = { x: 0, y: 0 };
 
 function getSettings(): Settings {
   return { ...DEFAULT_SETTINGS, ...store.get("settings") };
@@ -98,6 +108,9 @@ function snapshot(): AppSnapshot {
     settings: getSettings(),
     stats: getStats(),
     petState,
+    blockingMode,
+    petParked,
+    dogVisible: Boolean(petWindow?.isVisible()),
     focusActive
   };
 }
@@ -114,9 +127,13 @@ function sendToAll<T>(channel: string, payload?: T): void {
   }
 }
 
+function publishSnapshot(): void {
+  sendToAll("app:snapshot", snapshot());
+}
+
 function setPetState(next: PetState): void {
   petState = next;
-  sendToPet("pet:set-state", next);
+  sendToAll("pet:set-state", next);
 }
 
 function showBubble(bubble: SpeechBubble): void {
@@ -150,13 +167,50 @@ function loadRenderer(win: BrowserWindow, route: "pet" | "settings"): void {
   void win.loadFile(rendererUrl(route), { hash: route });
 }
 
-function createPetWindow(): void {
+function clampBoundsToWorkArea(bounds: Electron.Rectangle): Electron.Rectangle {
+  const center = {
+    x: bounds.x + Math.round(bounds.width / 2),
+    y: bounds.y + Math.round(bounds.height / 2)
+  };
+  const workArea = screen.getDisplayNearestPoint(center).workArea;
+  return {
+    ...bounds,
+    x: Math.min(Math.max(bounds.x, workArea.x), workArea.x + workArea.width - bounds.width),
+    y: Math.min(Math.max(bounds.y, workArea.y), workArea.y + workArea.height - bounds.height)
+  };
+}
+
+function initialPetBounds(): Electron.Rectangle {
   const workArea = screen.getPrimaryDisplay().workArea;
-  petWindow = new BrowserWindow({
+  const stored = store.get("petPosition");
+  const fallback = {
     width: PET_WINDOW_WIDTH,
     height: PET_WINDOW_HEIGHT,
     x: Math.round(workArea.x + workArea.width / 2 - PET_WINDOW_WIDTH / 2),
-    y: workArea.y + workArea.height - PET_WINDOW_HEIGHT,
+    y: workArea.y + workArea.height - PET_WINDOW_HEIGHT
+  };
+
+  if (!stored) return fallback;
+  return clampBoundsToWorkArea({
+    ...fallback,
+    x: stored.x,
+    y: stored.y
+  });
+}
+
+function persistPetPosition(): void {
+  if (!petWindow || petWindow.isDestroyed()) return;
+  const bounds = petWindow.getBounds();
+  store.set("petPosition", { x: bounds.x, y: bounds.y });
+}
+
+function createPetWindow(): void {
+  const bounds = initialPetBounds();
+  petWindow = new BrowserWindow({
+    width: PET_WINDOW_WIDTH,
+    height: PET_WINDOW_HEIGHT,
+    x: bounds.x,
+    y: bounds.y,
     transparent: true,
     frame: false,
     resizable: false,
@@ -180,11 +234,29 @@ function createPetWindow(): void {
   loadRenderer(petWindow, "pet");
   petWindow.once("ready-to-show", () => {
     petWindow?.showInactive();
-    sendToPet("app:snapshot", snapshot());
+    updateTrayMenu();
+    publishSnapshot();
+  });
+  petWindow.on("show", () => {
+    updateTrayMenu();
+    publishSnapshot();
+  });
+  petWindow.on("hide", () => {
+    updateTrayMenu();
+    publishSnapshot();
   });
   petWindow.on("closed", () => {
     petWindow = null;
+    updateTrayMenu();
+    publishSnapshot();
   });
+}
+
+function ensurePetWindowVisible(): void {
+  if (!petWindow || petWindow.isDestroyed()) createPetWindow();
+  if (petWindow && !petWindow.isVisible()) petWindow.showInactive();
+  updateTrayMenu();
+  publishSnapshot();
 }
 
 function createSettingsWindow(): void {
@@ -211,7 +283,7 @@ function createSettingsWindow(): void {
   loadRenderer(settingsWindow, "settings");
   settingsWindow.once("ready-to-show", () => {
     settingsWindow?.show();
-    sendToAll("app:snapshot", snapshot());
+    publishSnapshot();
   });
   settingsWindow.on("closed", () => {
     settingsWindow = null;
@@ -248,6 +320,7 @@ function actionMenuItems(): Electron.MenuItemConstructorOptions[] {
         if (petWindow.isVisible()) petWindow.hide();
         else petWindow.showInactive();
         updateTrayMenu();
+        sendToAll("app:snapshot", snapshot());
       }
     },
     {
@@ -255,6 +328,14 @@ function actionMenuItems(): Electron.MenuItemConstructorOptions[] {
       click: () => {
         if (focusActive) stopFocusMode(true);
         else startFocusMode();
+      }
+    },
+    {
+      label: petParked ? "Resume Walking" : "Park Dog Here",
+      enabled: dogVisible && !focusActive,
+      click: () => {
+        if (petParked) resumeWalking();
+        else parkPetHere();
       }
     },
     { type: "separator" },
@@ -303,6 +384,43 @@ function updateTrayMenu(): void {
   tray.setContextMenu(Menu.buildFromTemplate(template));
 }
 
+function showPetContextMenu(): void {
+  const template: Electron.MenuItemConstructorOptions[] = [
+    { label: "Settings", click: createSettingsWindow },
+    {
+      label: focusActive ? "Stop Focus Mode" : "Start Focus Mode",
+      click: () => {
+        if (focusActive) stopFocusMode(false);
+        else startFocusMode();
+      }
+    },
+    {
+      label: petParked ? "Resume Walking" : "Park Dog Here",
+      enabled: !focusActive,
+      click: () => {
+        if (petParked) resumeWalking();
+        else parkPetHere();
+      }
+    },
+    { type: "separator" },
+    { label: "Demo: Break Reminder", click: () => triggerDemo("break") },
+    { label: "Demo: Hydration Reminder", click: () => triggerDemo("hydration") },
+    { label: "Demo: Focus Warning", click: () => triggerDemo("focusWarning") },
+    { label: "Demo: Happy Reaction", click: () => triggerDemo("happy") },
+    { type: "separator" },
+    {
+      label: "Hide Dog",
+      click: () => {
+        petWindow?.hide();
+        updateTrayMenu();
+        sendToAll("app:snapshot", snapshot());
+      }
+    }
+  ];
+
+  Menu.buildFromTemplate(template).popup({ window: petWindow ?? undefined });
+}
+
 function pinToBottomRight(): void {
   if (!petWindow || petWindow.isDestroyed()) return;
   const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
@@ -314,11 +432,67 @@ function pinToBottomRight(): void {
   });
 }
 
+function parkPetHere(): void {
+  if (!petWindow || petWindow.isDestroyed()) return;
+  petParked = true;
+  store.set("petParked", true);
+  persistPetPosition();
+  if (!focusActive && !blockingMode) {
+    setPetState("sitting");
+    showBubble({ id: "parked", message: COPY.parked, autoDismissMs: 1800 });
+  }
+  updateTrayMenu();
+  sendToAll("app:snapshot", snapshot());
+}
+
+function resumeWalking(): void {
+  petParked = false;
+  store.set("petParked", false);
+  if (!focusActive && !blockingMode) {
+    setPetState("walking");
+    showBubble({ id: "resume-walking", message: COPY.resumeWalking, autoDismissMs: 1600 });
+  }
+  updateTrayMenu();
+  sendToAll("app:snapshot", snapshot());
+}
+
+function movePetWithCursor(): void {
+  if (!petWindow || petWindow.isDestroyed()) return;
+  const cursor = screen.getCursorScreenPoint();
+  const bounds = clampBoundsToWorkArea({
+    width: PET_WINDOW_WIDTH,
+    height: PET_WINDOW_HEIGHT,
+    x: cursor.x - dragOffset.x,
+    y: cursor.y - dragOffset.y
+  });
+  petWindow.setBounds(bounds);
+}
+
+function startPetDrag(offset: { offsetX: number; offsetY: number }): void {
+  if (focusActive || blockingMode || !petWindow || petWindow.isDestroyed()) return;
+  dragOffset = {
+    x: Math.min(Math.max(Math.round(offset.offsetX), 0), PET_WINDOW_WIDTH),
+    y: Math.min(Math.max(Math.round(offset.offsetY), 0), PET_WINDOW_HEIGHT)
+  };
+  if (dragTimer) clearInterval(dragTimer);
+  hideBubble();
+  setPetState("sitting");
+  movePetWithCursor();
+  dragTimer = setInterval(movePetWithCursor, 16);
+}
+
+function stopPetDrag(): void {
+  if (!dragTimer) return;
+  clearInterval(dragTimer);
+  dragTimer = null;
+  parkPetHere();
+}
+
 function startMovement(): void {
   if (movementTimer) clearInterval(movementTimer);
   movementTimer = setInterval(() => {
     if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible()) return;
-    if (blockingMode || focusActive || petState !== "walking") return;
+    if (blockingMode || focusActive || petParked || petState !== "walking") return;
 
     const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
     const bounds = petWindow.getBounds();
@@ -346,7 +520,7 @@ function startMovement(): void {
 function scheduleIdleBeat(): void {
   if (idleTimer) clearInterval(idleTimer);
   idleTimer = setInterval(() => {
-    if (blockingMode || focusActive || petState !== "walking") return;
+    if (blockingMode || focusActive || petParked || petState !== "walking") return;
     setPetState("idle");
     setTimeout(() => {
       if (!blockingMode && !focusActive && petState === "idle") setPetState("walking");
@@ -379,14 +553,16 @@ function resumeLongTermState(): void {
   if (focusActive) {
     setPetState("focusGuard");
     pinToBottomRight();
+    sendToAll("app:snapshot", snapshot());
     return;
   }
-  setPetState("walking");
+  setPetState(petParked ? "sitting" : "walking");
+  sendToAll("app:snapshot", snapshot());
 }
 
 function happyFeedback(message: string = COPY.woof, after?: () => void): void {
   if (blockingMode) return;
-  const returnState = focusActive ? "focusGuard" : "walking";
+  const returnState = focusActive ? "focusGuard" : petParked ? "sitting" : "walking";
   setPetState("happy");
   showBubble({ id: "happy", message, autoDismissMs: 1800 });
   setTimeout(() => {
@@ -403,7 +579,9 @@ function triggerBreakReminder(fromDemo: boolean): void {
     scheduleReminderTimers();
     return;
   }
+  ensurePetWindowVisible();
   blockingMode = "break";
+  sendToAll("app:snapshot", snapshot());
   setPetState("knocking");
   showBubble({
     id: "break",
@@ -421,7 +599,9 @@ function triggerHydrationReminder(fromDemo: boolean): void {
     scheduleReminderTimers();
     return;
   }
+  ensurePetWindowVisible();
   blockingMode = "hydration";
+  sendToAll("app:snapshot", snapshot());
   setPetState("thirsty");
   showBubble({
     id: "hydration",
@@ -434,9 +614,11 @@ function triggerHydrationReminder(fromDemo: boolean): void {
 }
 
 function triggerFocusWarning(): void {
+  ensurePetWindowVisible();
   if (!focusActive) startFocusMode();
   blockingMode = "focusWarning";
   updateStats((stats) => ({ ...stats, focusWarnings: stats.focusWarnings + 1 }));
+  sendToAll("app:snapshot", snapshot());
   setPetState("focusGuard");
   pinToBottomRight();
   showBubble({
@@ -451,10 +633,13 @@ function triggerFocusWarning(): void {
 
 function startFocusMode(): void {
   if (focusActive) return;
+  ensurePetWindowVisible();
   const settings = getSettings();
   focusActive = true;
   focusStartedAt = Date.now();
   blockingMode = null;
+  petParked = false;
+  store.set("petParked", false);
   setPetState("focusGuard");
   sendToAll("app:snapshot", snapshot());
   pinToBottomRight();
@@ -496,16 +681,14 @@ function stopFocusMode(completed: boolean): void {
   setTimeout(() => {
     if (!focusActive && !blockingMode) {
       hideBubble();
-      setPetState("walking");
+      setPetState(petParked ? "sitting" : "walking");
     }
   }, 2900);
   updateTrayMenu();
 }
 
 function triggerDemo(trigger: DemoTrigger): void {
-  if (!petWindow) createPetWindow();
-  petWindow?.showInactive();
-  updateTrayMenu();
+  ensurePetWindowVisible();
   if (trigger === "break") triggerBreakReminder(true);
   if (trigger === "hydration") triggerHydrationReminder(true);
   if (trigger === "focusWarning") triggerFocusWarning();
@@ -516,6 +699,7 @@ function handleBubbleAction(actionId: string): void {
   if (actionId === "break:done") {
     updateStats((stats) => ({ ...stats, breaksTaken: stats.breaksTaken + 1 }));
     blockingMode = null;
+    sendToAll("app:snapshot", snapshot());
     happyFeedback(COPY.breakDone, scheduleReminderTimers);
     return;
   }
@@ -527,6 +711,8 @@ function handleBubbleAction(actionId: string): void {
   }
   if (actionId === "break:mute") {
     breakMutedToday = true;
+    blockingMode = null;
+    sendToAll("app:snapshot", snapshot());
     setPetState("annoyed");
     showBubble({ id: "break-muted", message: COPY.breakIgnore, autoDismissMs: 2600 });
     setTimeout(resumeLongTermState, 2700);
@@ -535,6 +721,7 @@ function handleBubbleAction(actionId: string): void {
   if (actionId === "hydration:done") {
     updateStats((stats) => ({ ...stats, watersLogged: stats.watersLogged + 1 }));
     blockingMode = null;
+    sendToAll("app:snapshot", snapshot());
     setPetState("drinking");
     showBubble({ id: "hydration-done", message: COPY.hydrationDone, autoDismissMs: 2300 });
     setTimeout(() => happyFeedback(COPY.hydrationDone, scheduleReminderTimers), 2400);
@@ -548,6 +735,7 @@ function handleBubbleAction(actionId: string): void {
   }
   if (actionId === "focus:back") {
     blockingMode = null;
+    sendToAll("app:snapshot", snapshot());
     setPetState("focusGuard");
     showBubble({ id: "focus-back", message: COPY.focusBack, autoDismissMs: 1800 });
     setTimeout(() => {
@@ -566,6 +754,12 @@ function registerIpc(): void {
     if (blockingMode) return;
     happyFeedback(COPY.woof);
   });
+  ipcMain.on("pet:context-menu", showPetContextMenu);
+  ipcMain.on("pet:drag-start", (_event, offset: { offsetX: number; offsetY: number }) =>
+    startPetDrag(offset)
+  );
+  ipcMain.on("pet:drag-stop", stopPetDrag);
+  ipcMain.on("pet:resume-walking", resumeWalking);
   ipcMain.on("bubble:action", (_event, actionId: string) => handleBubbleAction(actionId));
   ipcMain.on("settings:update", (_event, partial: Partial<Settings>) => {
     setSettings({ ...getSettings(), ...partial });
@@ -594,7 +788,15 @@ app.whenReady().then(() => {
 });
 
 app.on("before-quit", () => {
-  for (const timer of [movementTimer, breakTimer, hydrationTimer, focusTimer, idleTimer, bubbleTimer]) {
+  for (const timer of [
+    movementTimer,
+    breakTimer,
+    hydrationTimer,
+    focusTimer,
+    idleTimer,
+    bubbleTimer,
+    dragTimer
+  ]) {
     if (timer) clearTimeout(timer);
   }
 });

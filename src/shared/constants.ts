@@ -34,5 +34,7 @@ export const COPY = {
   focusStart: "我会帮你守住这 25 分钟。",
   focusWarning: "嘿，说好专注的",
   focusComplete: "守护成功！尾巴批准。",
-  focusBack: "好，我继续守着。"
+  focusBack: "好，我继续守着。",
+  parked: "好，我就在这里待着。",
+  resumeWalking: "我继续巡逻啦。"
 } as const;

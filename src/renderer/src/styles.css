@@ -234,32 +234,42 @@ h2 {
 }
 
 .stats-grid,
+.runtime-grid,
 .demo-grid {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.stats-grid {
+.stats-grid,
+.runtime-grid {
   margin: 0;
 }
 
-.stats-grid div {
+.stats-grid div,
+.runtime-grid div {
   background: #f4eadb;
   border-radius: 8px;
   padding: 12px;
 }
 
-.stats-grid dt {
+.stats-grid dt,
+.runtime-grid dt {
   color: #6f6256;
   font-size: 12px;
   margin-bottom: 4px;
 }
 
-.stats-grid dd {
+.stats-grid dd,
+.runtime-grid dd {
   font-size: 24px;
   font-weight: 750;
   margin: 0;
+}
+
+.runtime-grid dd {
+  font-size: 14px;
+  overflow-wrap: anywhere;
 }
 
 .command-button,
@@ -291,7 +301,7 @@ h2 {
 .settings-actions {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   padding-top: 4px;
 }
 

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import type { JSX } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { JSX, PointerEvent } from "react";
 import type {
   AppSnapshot,
   DemoTrigger,
@@ -47,12 +47,22 @@ const initialStats: TodayStats = {
   focusWarnings: 0
 };
 
+type DragRef = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  dragging: boolean;
+};
+
 function useSnapshot(): AppSnapshot {
   const [snapshot, setSnapshot] = useState<AppSnapshot>({
     settings: initialSettings,
     stats: initialStats,
     petState: "walking",
-    focusActive: false
+    blockingMode: null,
+    focusActive: false,
+    petParked: false,
+    dogVisible: true
   });
 
   useEffect(() => {
@@ -86,6 +96,7 @@ function PetView(): JSX.Element {
   const snapshot = useSnapshot();
   const [bubble, setBubble] = useState<SpeechBubble | null>(null);
   const assetUrls = useMemo(createAssetUrls, []);
+  const dragRef = useRef<DragRef | null>(null);
 
   useEffect(() => {
     const offBubble = window.pawse.onShowBubble(setBubble);
@@ -99,8 +110,57 @@ function PetView(): JSX.Element {
   const state = snapshot.petState;
   const altText = `Pawse ${state}`;
 
+  function startPointer(event: PointerEvent<HTMLButtonElement>): void {
+    if (event.button !== 0) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      dragging: false
+    };
+  }
+
+  function movePointer(event: PointerEvent<HTMLButtonElement>): void {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+    if (!drag.dragging && distance > 4) {
+      drag.dragging = true;
+      window.pawse.petDragStart({ offsetX: drag.startX, offsetY: drag.startY });
+    }
+  }
+
+  function stopPointer(event: PointerEvent<HTMLButtonElement>): void {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    dragRef.current = null;
+    if (drag.dragging) {
+      window.pawse.petDragStop();
+      return;
+    }
+    window.pawse.petClicked();
+  }
+
+  function cancelPointer(event: PointerEvent<HTMLButtonElement>): void {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    if (drag.dragging) window.pawse.petDragStop();
+  }
+
   return (
-    <main className="pet-shell" aria-label="Pawse desktop pet">
+    <main
+      className="pet-shell"
+      aria-label="Pawse desktop pet"
+      onContextMenu={(event) => {
+        event.preventDefault();
+        window.pawse.petContextMenu();
+      }}
+    >
       {bubble ? (
         <section className="speech-bubble">
           <p>{bubble.message}</p>
@@ -125,7 +185,14 @@ function PetView(): JSX.Element {
         <div className="focus-badge">Focus</div>
       ) : null}
 
-      <button className={`pet-button state-${state}`} onClick={window.pawse.petClicked} type="button">
+      <button
+        className={`pet-button state-${state}`}
+        onPointerCancel={cancelPointer}
+        onPointerDown={startPointer}
+        onPointerMove={movePointer}
+        onPointerUp={stopPointer}
+        type="button"
+      >
         <img draggable={false} src={assetUrls[state]} alt={altText} />
       </button>
     </main>
@@ -194,19 +261,21 @@ function SettingsView(): JSX.Element {
   const snapshot = useSnapshot();
   const { settings, stats } = snapshot;
   const [draft, setDraft] = useState(settings);
+  const [settingsDirty, setSettingsDirty] = useState(false);
 
   useEffect(() => {
     setDraft(settings);
+    setSettingsDirty(false);
   }, [settings]);
-
-  const canSave = useMemo(() => JSON.stringify(draft) !== JSON.stringify(settings), [draft, settings]);
 
   function updateDraft(partial: Partial<Settings>): void {
     setDraft((current) => ({ ...current, ...partial }));
+    setSettingsDirty(true);
   }
 
   function save(): void {
     window.pawse.updateSettings(draft);
+    setSettingsDirty(false);
   }
 
   return (
@@ -288,6 +357,28 @@ function SettingsView(): JSX.Element {
       </section>
 
       <section className="settings-section">
+        <h2>Runtime</h2>
+        <dl className="runtime-grid">
+          <div>
+            <dt>State</dt>
+            <dd>{snapshot.petState}</dd>
+          </div>
+          <div>
+            <dt>Mode</dt>
+            <dd>{snapshot.focusActive ? "focus" : snapshot.petParked ? "parked" : "walking"}</dd>
+          </div>
+          <div>
+            <dt>Reminder</dt>
+            <dd>{snapshot.blockingMode ?? "none"}</dd>
+          </div>
+          <div>
+            <dt>Dog</dt>
+            <dd>{snapshot.dogVisible ? "visible" : "hidden"}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="settings-section">
         <h2>Demo</h2>
         <div className="demo-grid">
           <DemoButton trigger="break">Break</DemoButton>
@@ -307,7 +398,10 @@ function SettingsView(): JSX.Element {
         <button className="secondary-action" type="button" onClick={window.pawse.stopFocus}>
           Stop Focus
         </button>
-        <button className="primary-action" type="button" disabled={!canSave} onClick={save}>
+        <button className="secondary-action" type="button" onClick={window.pawse.resumeWalking}>
+          Resume Walk
+        </button>
+        <button className="primary-action" type="button" disabled={!settingsDirty} onClick={save}>
           Save
         </button>
       </footer>

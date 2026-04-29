@@ -22,6 +22,8 @@ export type SpeechBubble = {
   autoDismissMs?: number;
 };
 
+export type BlockingMode = "break" | "hydration" | "focusWarning" | null;
+
 export type Settings = {
   breakReminderEnabled: boolean;
   breakIntervalMinutes: number;
@@ -44,7 +46,10 @@ export type AppSnapshot = {
   settings: Settings;
   stats: TodayStats;
   petState: PetState;
+  blockingMode: BlockingMode;
   focusActive: boolean;
+  petParked: boolean;
+  dogVisible: boolean;
 };
 
 export type DemoTrigger =
