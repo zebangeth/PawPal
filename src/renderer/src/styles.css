@@ -54,8 +54,13 @@ textarea {
   height: 184px;
   object-fit: contain;
   pointer-events: none;
+  transform: scaleX(1);
   user-select: none;
   width: 184px;
+}
+
+.pet-button.facing-left img {
+  transform: scaleX(-1);
 }
 
 .state-walking {

@@ -6,7 +6,7 @@ export function createAssetUrls(): Record<PetState, string> {
     idle: window.pawse.assetUrl("lovart_footage/puppy/standing pose.gif"),
     sitting: window.pawse.assetUrl("lovart_footage/puppy/3 - welcome to work.gif"),
     happy: window.pawse.assetUrl("lovart_footage/puppy/1 - waiting for playing outside.gif"),
-    knocking: window.pawse.assetUrl("lovart_footage/puppy/2 - standing reminder.gif"),
+    knocking: window.pawse.assetUrl("lovart_footage/puppy/1 - waiting for playing outside.gif"),
     thirsty: window.pawse.assetUrl("lovart_footage/water_gifs/want_water.gif"),
     drinking: window.pawse.assetUrl("lovart_footage/water_gifs/got_water.gif"),
     focusGuard: window.pawse.assetUrl("lovart_footage/puppy/standing pose4.gif"),

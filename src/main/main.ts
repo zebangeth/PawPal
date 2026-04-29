@@ -11,6 +11,7 @@ import type {
   BlockingMode,
   DistractionStatus,
   DemoTrigger,
+  PetFacing,
   PetState,
   Settings,
   SpeechBubble,
@@ -18,6 +19,8 @@ import type {
 } from "../shared/types";
 import {
   APP_NAME,
+  BREAK_RUN_DURATION_MS,
+  BREAK_RUN_TICK_MS,
   DISTRACTION_CHECK_INTERVAL_MS,
   DISTRACTION_WARNING_COOLDOWN_MS,
   IS_DEV,
@@ -58,10 +61,14 @@ let settingsWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let petParked = store.get("petParked", false);
 let petState: PetState = petParked ? "sitting" : "walking";
+let petFacing: PetFacing = "right";
 let blockingMode: BlockingMode = null;
 let focusActive = false;
 let focusStartedAt: number | null = null;
 let movementTimer: NodeJS.Timeout | null = null;
+let breakRunTimer: NodeJS.Timeout | null = null;
+let breakRunCountdownTimer: NodeJS.Timeout | null = null;
+let breakRunMovementTimer: NodeJS.Timeout | null = null;
 let breakTimer: NodeJS.Timeout | null = null;
 let hydrationTimer: NodeJS.Timeout | null = null;
 let focusTimer: NodeJS.Timeout | null = null;
@@ -74,6 +81,8 @@ let idleTimer: NodeJS.Timeout | null = null;
 let bubbleTimer: NodeJS.Timeout | null = null;
 let dragTimer: NodeJS.Timeout | null = null;
 let walkDirection: 1 | -1 = 1;
+let breakRunDirection: 1 | -1 = 1;
+let nextBreakRunTurnAt = 0;
 let breakMutedToday = false;
 let dragOffset: PetPosition = { x: 0, y: 0 };
 let distractionStatus: DistractionStatus = {
@@ -139,6 +148,7 @@ function snapshot(): AppSnapshot {
     },
     distraction: distractionStatus,
     petState,
+    petFacing,
     blockingMode,
     petParked,
     dogVisible: Boolean(petWindow?.isVisible()),
@@ -165,6 +175,12 @@ function publishSnapshot(): void {
 function setPetState(next: PetState): void {
   petState = next;
   sendToAll("pet:set-state", next);
+}
+
+function setPetFacing(next: PetFacing): void {
+  if (petFacing === next) return;
+  petFacing = next;
+  publishSnapshot();
 }
 
 function showBubble(bubble: SpeechBubble): void {
@@ -520,6 +536,101 @@ function stopPetDrag(): void {
   parkPetHere();
 }
 
+function clearBreakRunTimers(): void {
+  if (breakRunTimer) {
+    clearTimeout(breakRunTimer);
+    breakRunTimer = null;
+  }
+  if (breakRunCountdownTimer) {
+    clearInterval(breakRunCountdownTimer);
+    breakRunCountdownTimer = null;
+  }
+  if (breakRunMovementTimer) {
+    clearInterval(breakRunMovementTimer);
+    breakRunMovementTimer = null;
+  }
+}
+
+function showBreakRunCountdown(endsAt: number): void {
+  const remainingSeconds = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
+  showBubble({
+    id: "break-run",
+    message: text().bubble.breakRun(remainingSeconds)
+  });
+}
+
+function movePetForBreakRun(): void {
+  if (!petWindow || petWindow.isDestroyed() || !petWindow.isVisible()) return;
+
+  const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  const bounds = petWindow.getBounds();
+  const now = Date.now();
+  const minX = workArea.x + 8;
+  const maxX = workArea.x + workArea.width - PET_WINDOW.width - 8;
+
+  if (now >= nextBreakRunTurnAt && Math.random() < 0.45) {
+    breakRunDirection = breakRunDirection === 1 ? -1 : 1;
+  }
+
+  const speed = 9 + Math.round(Math.random() * 10);
+  let nextX = bounds.x + breakRunDirection * speed;
+
+  if (nextX <= minX) {
+    nextX = minX;
+    breakRunDirection = 1;
+  }
+  if (nextX >= maxX) {
+    nextX = maxX;
+    breakRunDirection = -1;
+  }
+
+  if (now >= nextBreakRunTurnAt) {
+    nextBreakRunTurnAt = now + 350 + Math.round(Math.random() * 850);
+  }
+
+  setPetFacing(breakRunDirection === 1 ? "right" : "left");
+  petWindow.setBounds({
+    ...bounds,
+    x: nextX,
+    y: workArea.y + workArea.height - PET_WINDOW.height
+  });
+}
+
+function finishBreakRun(): void {
+  clearBreakRunTimers();
+  blockingMode = null;
+  hideBubble();
+  showBubble({ id: "break-run-complete", message: text().bubble.breakRunComplete, autoDismissMs: 2200 });
+  setPetState("happy");
+  setTimeout(() => {
+    if (!blockingMode && !focusActive) {
+      hideBubble();
+      setPetState(petParked ? "sitting" : "walking");
+      scheduleReminderTimers();
+    }
+  }, 2300);
+  publishSnapshot();
+}
+
+function startBreakRun(): void {
+  ensurePetWindowVisible();
+  clearBreakRunTimers();
+  blockingMode = "breakRun";
+  breakDueAt = null;
+  petParked = false;
+  store.set("petParked", false);
+  breakRunDirection = Math.random() < 0.5 ? -1 : 1;
+  nextBreakRunTurnAt = Date.now();
+  setPetState("walking");
+  setPetFacing(breakRunDirection === 1 ? "right" : "left");
+  const endsAt = Date.now() + BREAK_RUN_DURATION_MS;
+  showBreakRunCountdown(endsAt);
+  breakRunCountdownTimer = setInterval(() => showBreakRunCountdown(endsAt), 1000);
+  breakRunMovementTimer = setInterval(movePetForBreakRun, BREAK_RUN_TICK_MS);
+  breakRunTimer = setTimeout(finishBreakRun, BREAK_RUN_DURATION_MS);
+  publishSnapshot();
+}
+
 function startMovement(): void {
   if (movementTimer) clearInterval(movementTimer);
   movementTimer = setInterval(() => {
@@ -540,6 +651,7 @@ function startMovement(): void {
       nextX = maxX;
       walkDirection = -1;
     }
+    setPetFacing(walkDirection === 1 ? "right" : "left");
 
     petWindow.setBounds({
       ...bounds,
@@ -688,7 +800,7 @@ function happyFeedback(message: string = text().bubble.woof, after?: () => void)
 }
 
 function triggerBreakReminder(fromDemo: boolean): void {
-  if (blockingMode === "focusWarning") return;
+  if (blockingMode === "focusWarning" || blockingMode === "breakRun") return;
   if (!fromDemo && (focusActive || breakMutedToday)) {
     scheduleReminderTimers();
     return;
@@ -732,6 +844,7 @@ function triggerHydrationReminder(fromDemo: boolean): void {
 }
 
 function triggerFocusWarning(): void {
+  if (blockingMode === "breakRun") return;
   ensurePetWindowVisible();
   if (!focusActive) startFocusMode();
   blockingMode = "focusWarning";
@@ -751,7 +864,7 @@ function triggerFocusWarning(): void {
 }
 
 function startFocusMode(): void {
-  if (focusActive) return;
+  if (focusActive || blockingMode) return;
   ensurePetWindowVisible();
   const settings = getSettings();
   focusActive = true;
@@ -821,9 +934,7 @@ function triggerDemo(trigger: DemoTrigger): void {
 function handleBubbleAction(actionId: string): void {
   if (actionId === "break:done") {
     updateStats((stats) => ({ ...stats, breaksTaken: stats.breaksTaken + 1 }));
-    blockingMode = null;
-    sendToAll("app:snapshot", snapshot());
-    happyFeedback(text().bubble.breakDone, scheduleReminderTimers);
+    startBreakRun();
     return;
   }
   if (actionId === "break:snooze") {
@@ -919,6 +1030,9 @@ app.whenReady().then(() => {
 app.on("before-quit", () => {
   for (const timer of [
     movementTimer,
+    breakRunTimer,
+    breakRunCountdownTimer,
+    breakRunMovementTimer,
     breakTimer,
     hydrationTimer,
     focusTimer,

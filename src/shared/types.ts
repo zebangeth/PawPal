@@ -1,5 +1,7 @@
 export type Language = "zh-CN" | "en";
 
+export type PetFacing = "left" | "right";
+
 export type PetState =
   | "walking"
   | "idle"
@@ -24,7 +26,7 @@ export type SpeechBubble = {
   autoDismissMs?: number;
 };
 
-export type BlockingMode = "break" | "hydration" | "focusWarning" | null;
+export type BlockingMode = "break" | "breakRun" | "hydration" | "focusWarning" | null;
 
 export type Settings = {
   language: Language;
@@ -70,6 +72,7 @@ export type AppSnapshot = {
   timers: TimerStatus;
   distraction: DistractionStatus;
   petState: PetState;
+  petFacing: PetFacing;
   blockingMode: BlockingMode;
   focusActive: boolean;
   petParked: boolean;

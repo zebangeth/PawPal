@@ -30,6 +30,7 @@ export function PetView(): JSX.Element {
 
   const state = snapshot.petState;
   const altText = `Pawse ${state}`;
+  const facingClass = snapshot.petFacing === "left" ? "facing-left" : "facing-right";
 
   function startPointer(event: PointerEvent<HTMLButtonElement>): void {
     if (event.button !== 0) return;
@@ -107,7 +108,7 @@ export function PetView(): JSX.Element {
       ) : null}
 
       <button
-        className={`pet-button state-${state}`}
+        className={`pet-button state-${state} ${facingClass}`}
         onPointerCancel={cancelPointer}
         onPointerDown={startPointer}
         onPointerMove={movePointer}

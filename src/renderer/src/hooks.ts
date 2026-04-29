@@ -29,6 +29,7 @@ export function useSnapshot(): AppSnapshot {
       error: null
     },
     petState: "walking",
+    petFacing: "right",
     blockingMode: null,
     focusActive: false,
     petParked: false,
