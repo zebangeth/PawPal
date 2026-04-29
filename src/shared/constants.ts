@@ -7,6 +7,23 @@ export const DEFAULT_SETTINGS: Settings = {
   hydrationIntervalMinutes: 90,
   focusDurationMinutes: 25,
   distractionDetectionEnabled: false,
+  distractionGraceSeconds: 8,
+  distractionBlockedApps: ["Steam", "Discord", "Telegram"],
+  distractionBlockedKeywords: [
+    "youtube",
+    "youtu.be",
+    "twitter",
+    "x.com",
+    "instagram",
+    "reddit",
+    "tiktok",
+    "netflix",
+    "bilibili",
+    "weibo",
+    "小红书",
+    "微博",
+    "抖音"
+  ],
   soundEnabled: false
 };
 

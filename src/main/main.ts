@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, Menu, nativeImage, screen, Tray } from "electron";
 import Store from "electron-store";
+import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
@@ -11,6 +12,7 @@ import {
 import type {
   AppSnapshot,
   BlockingMode,
+  DistractionStatus,
   DemoTrigger,
   PetState,
   Settings,
@@ -38,6 +40,9 @@ const SETTINGS_WINDOW_WIDTH = 460;
 const SETTINGS_WINDOW_HEIGHT = 600;
 const PRELOAD_PATH = join(__dirname, "../preload/index.cjs");
 const IS_DEV = Boolean(process.env.ELECTRON_RENDERER_URL);
+const DISTRACTION_CHECK_INTERVAL_MS = 3000;
+const DISTRACTION_WARNING_COOLDOWN_MS = 60_000;
+const IGNORED_DISTRACTION_APPS = ["Pawse", "Electron"];
 
 app.setName("Pawse");
 
@@ -62,6 +67,7 @@ let movementTimer: NodeJS.Timeout | null = null;
 let breakTimer: NodeJS.Timeout | null = null;
 let hydrationTimer: NodeJS.Timeout | null = null;
 let focusTimer: NodeJS.Timeout | null = null;
+let distractionTimer: NodeJS.Timeout | null = null;
 let breakDueAt: number | null = null;
 let hydrationDueAt: number | null = null;
 let focusEndsAt: number | null = null;
@@ -71,6 +77,15 @@ let dragTimer: NodeJS.Timeout | null = null;
 let walkDirection: 1 | -1 = 1;
 let breakMutedToday = false;
 let dragOffset: PetPosition = { x: 0, y: 0 };
+let distractionStatus: DistractionStatus = {
+  state: "idle",
+  activeApp: "",
+  activeWindowTitle: "",
+  matchedRule: null,
+  lastCheckedAt: null,
+  lastWarningAt: null,
+  error: null
+};
 
 function getSettings(): Settings {
   return { ...DEFAULT_SETTINGS, ...store.get("settings") };
@@ -80,6 +95,7 @@ function setSettings(next: Settings): void {
   store.set("settings", next);
   sendToAll("settings:updated", next);
   scheduleReminderTimers();
+  scheduleDistractionDetection();
   updateTrayMenu();
 }
 
@@ -115,6 +131,7 @@ function snapshot(): AppSnapshot {
       hydrationDueAt,
       focusEndsAt
     },
+    distraction: distractionStatus,
     petState,
     blockingMode,
     petParked,
@@ -560,6 +577,149 @@ function scheduleReminderTimers(): void {
   publishSnapshot();
 }
 
+function setDistractionStatus(partial: Partial<DistractionStatus>): void {
+  distractionStatus = { ...distractionStatus, ...partial };
+  publishSnapshot();
+}
+
+function normalizeRule(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function activeWindowScript(): string {
+  return `
+tell application "System Events"
+  set frontAppProcess to first application process whose frontmost is true
+  set frontApp to name of frontAppProcess
+  set frontWindow to ""
+  try
+    set frontWindow to name of front window of frontAppProcess
+  end try
+end tell
+return frontApp & linefeed & frontWindow
+`;
+}
+
+function readActiveWindow(): Promise<{ appName: string; windowTitle: string }> {
+  return new Promise((resolve, reject) => {
+    execFile("/usr/bin/osascript", ["-e", activeWindowScript()], { timeout: 2500 }, (error, stdout) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      const [appName = "", ...titleParts] = stdout.trimEnd().split("\n");
+      resolve({
+        appName: appName.trim(),
+        windowTitle: titleParts.join("\n").trim()
+      });
+    });
+  });
+}
+
+function classifyDistraction(
+  active: { appName: string; windowTitle: string },
+  settings: Settings
+): string | null {
+  const appName = active.appName.trim();
+  const title = active.windowTitle.trim();
+  const appNameLower = appName.toLowerCase();
+  const titleLower = title.toLowerCase();
+
+  if (IGNORED_DISTRACTION_APPS.some((ignored) => ignored.toLowerCase() === appNameLower)) {
+    return null;
+  }
+
+  const blockedApp = settings.distractionBlockedApps
+    .map(normalizeRule)
+    .filter(Boolean)
+    .find((rule) => appNameLower.includes(rule));
+  if (blockedApp) return `app:${blockedApp}`;
+
+  const blockedKeyword = settings.distractionBlockedKeywords
+    .map(normalizeRule)
+    .filter(Boolean)
+    .find((rule) => titleLower.includes(rule) || appNameLower.includes(rule));
+  if (blockedKeyword) return `keyword:${blockedKeyword}`;
+
+  return null;
+}
+
+function isPermissionError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("not allowed assistive access") ||
+    message.includes("System Events got an error") ||
+    message.includes("not authorized") ||
+    message.includes("Operation not permitted")
+  );
+}
+
+async function checkDistractionNow(): Promise<void> {
+  if (!focusActive || blockingMode === "focusWarning") return;
+  const settings = getSettings();
+  if (!settings.distractionDetectionEnabled) return;
+
+  try {
+    const active = await readActiveWindow();
+    const matchedRule = classifyDistraction(active, settings);
+    const now = Date.now();
+
+    setDistractionStatus({
+      state: "watching",
+      activeApp: active.appName,
+      activeWindowTitle: active.windowTitle,
+      matchedRule,
+      lastCheckedAt: now,
+      error: null
+    });
+
+    if (!matchedRule) return;
+    if (
+      distractionStatus.lastWarningAt &&
+      now - distractionStatus.lastWarningAt < DISTRACTION_WARNING_COOLDOWN_MS
+    ) {
+      return;
+    }
+
+    setDistractionStatus({ lastWarningAt: now });
+    triggerFocusWarning();
+  } catch (error) {
+    setDistractionStatus({
+      state: isPermissionError(error) ? "permission-needed" : "error",
+      error: error instanceof Error ? error.message : String(error),
+      lastCheckedAt: Date.now()
+    });
+  }
+}
+
+function scheduleDistractionDetection(): void {
+  if (distractionTimer) {
+    clearInterval(distractionTimer);
+    distractionTimer = null;
+  }
+
+  const settings = getSettings();
+  if (!focusActive || !settings.distractionDetectionEnabled) {
+    setDistractionStatus({
+      state: "idle",
+      matchedRule: null,
+      error: null
+    });
+    return;
+  }
+
+  setDistractionStatus({
+    state: process.platform === "darwin" ? "watching" : "unsupported",
+    error: process.platform === "darwin" ? null : "Distraction detection currently supports macOS only."
+  });
+
+  if (process.platform !== "darwin") return;
+
+  const firstCheckDelay = Math.max(0, settings.distractionGraceSeconds * 1000);
+  setTimeout(() => void checkDistractionNow(), firstCheckDelay);
+  distractionTimer = setInterval(() => void checkDistractionNow(), DISTRACTION_CHECK_INTERVAL_MS);
+}
+
 function resumeLongTermState(): void {
   blockingMode = null;
   hideBubble();
@@ -669,6 +829,7 @@ function startFocusMode(): void {
     () => stopFocusMode(true),
     settings.focusDurationMinutes * 60 * 1000
   );
+  scheduleDistractionDetection();
   updateTrayMenu();
 }
 
@@ -684,6 +845,7 @@ function stopFocusMode(completed: boolean): void {
     focusTimer = null;
   }
   focusEndsAt = null;
+  scheduleDistractionDetection();
   updateStats((stats) => ({
     ...stats,
     focusMinutes: stats.focusMinutes + elapsedMinutes
@@ -815,6 +977,7 @@ app.on("before-quit", () => {
     breakTimer,
     hydrationTimer,
     focusTimer,
+    distractionTimer,
     idleTimer,
     bubbleTimer,
     dragTimer

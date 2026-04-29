@@ -31,6 +31,9 @@ export type Settings = {
   hydrationIntervalMinutes: number;
   focusDurationMinutes: number;
   distractionDetectionEnabled: boolean;
+  distractionGraceSeconds: number;
+  distractionBlockedApps: string[];
+  distractionBlockedKeywords: string[];
   soundEnabled: boolean;
 };
 
@@ -48,10 +51,21 @@ export type TimerStatus = {
   focusEndsAt: number | null;
 };
 
+export type DistractionStatus = {
+  state: "idle" | "watching" | "permission-needed" | "unsupported" | "error";
+  activeApp: string;
+  activeWindowTitle: string;
+  matchedRule: string | null;
+  lastCheckedAt: number | null;
+  lastWarningAt: number | null;
+  error: string | null;
+};
+
 export type AppSnapshot = {
   settings: Settings;
   stats: TodayStats;
   timers: TimerStatus;
+  distraction: DistractionStatus;
   petState: PetState;
   blockingMode: BlockingMode;
   focusActive: boolean;

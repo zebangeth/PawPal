@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { JSX, PointerEvent } from "react";
+import { DEFAULT_SETTINGS } from "../../shared/constants";
 import type {
   AppSnapshot,
   DemoTrigger,
@@ -29,15 +30,7 @@ function createAssetUrls(): Record<PetState, string> {
   };
 }
 
-const initialSettings: Settings = {
-  breakReminderEnabled: true,
-  breakIntervalMinutes: 45,
-  hydrationReminderEnabled: true,
-  hydrationIntervalMinutes: 90,
-  focusDurationMinutes: 25,
-  distractionDetectionEnabled: false,
-  soundEnabled: false
-};
+const initialSettings: Settings = DEFAULT_SETTINGS;
 
 const initialStats: TodayStats = {
   date: "",
@@ -62,6 +55,15 @@ function useSnapshot(): AppSnapshot {
       breakDueAt: null,
       hydrationDueAt: null,
       focusEndsAt: null
+    },
+    distraction: {
+      state: "idle",
+      activeApp: "",
+      activeWindowTitle: "",
+      matchedRule: null,
+      lastCheckedAt: null,
+      lastWarningAt: null,
+      error: null
     },
     petState: "walking",
     blockingMode: null,
