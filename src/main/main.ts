@@ -1,8 +1,5 @@
-import { app, BrowserWindow, ipcMain, Menu, nativeImage, screen, Tray } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, screen, Tray } from "electron";
 import Store from "electron-store";
-import { execFile } from "node:child_process";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
 import {
   createEmptyStats,
   DEFAULT_SETTINGS,
@@ -19,6 +16,19 @@ import type {
   SpeechBubble,
   TodayStats
 } from "../shared/types";
+import {
+  APP_NAME,
+  DISTRACTION_CHECK_INTERVAL_MS,
+  DISTRACTION_WARNING_COOLDOWN_MS,
+  IS_DEV,
+  PET_WINDOW,
+  PRELOAD_PATH,
+  RENDERER_HTML_PATH,
+  SETTINGS_WINDOW,
+  STORE_NAME
+} from "./config";
+import { classifyDistraction, isPermissionError, readActiveWindow } from "./distraction";
+import { createTrayImage } from "./trayIcon";
 
 type PetPosition = {
   x: number;
@@ -32,22 +42,10 @@ type StoreSchema = {
   petParked: boolean;
 };
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const PET_WINDOW_WIDTH = 320;
-const PET_WINDOW_HEIGHT = 300;
-const SETTINGS_WINDOW_WIDTH = 460;
-const SETTINGS_WINDOW_HEIGHT = 600;
-const PRELOAD_PATH = join(__dirname, "../preload/index.cjs");
-const IS_DEV = Boolean(process.env.ELECTRON_RENDERER_URL);
-const DISTRACTION_CHECK_INTERVAL_MS = 3000;
-const DISTRACTION_WARNING_COOLDOWN_MS = 60_000;
-const IGNORED_DISTRACTION_APPS = ["Pawse", "Electron"];
-
-app.setName("Pawse");
+app.setName(APP_NAME);
 
 const store = new Store<StoreSchema>({
-  name: "pawse-demo",
+  name: STORE_NAME,
   defaults: {
     settings: DEFAULT_SETTINGS,
     stats: createEmptyStats(),
@@ -101,7 +99,7 @@ function setSettings(next: Settings): void {
   const normalized = { ...next, language: resolveLanguage(next.language) };
   store.set("settings", normalized);
   sendToAll("settings:updated", normalized);
-  settingsWindow?.setTitle(`Pawse ${text().menu.settings}`);
+  settingsWindow?.setTitle(`${APP_NAME} ${text().menu.settings}`);
   scheduleReminderTimers();
   scheduleDistractionDetection();
   updateTrayMenu();
@@ -188,7 +186,7 @@ function hideBubble(): void {
 function rendererUrl(route: "pet" | "settings"): string {
   const devServer = process.env.ELECTRON_RENDERER_URL;
   if (devServer) return `${devServer}#${route}`;
-  return join(__dirname, "../renderer/index.html");
+  return RENDERER_HTML_PATH;
 }
 
 function loadRenderer(win: BrowserWindow, route: "pet" | "settings"): void {
@@ -217,10 +215,10 @@ function initialPetBounds(): Electron.Rectangle {
   const workArea = screen.getPrimaryDisplay().workArea;
   const stored = store.get("petPosition");
   const fallback = {
-    width: PET_WINDOW_WIDTH,
-    height: PET_WINDOW_HEIGHT,
-    x: Math.round(workArea.x + workArea.width / 2 - PET_WINDOW_WIDTH / 2),
-    y: workArea.y + workArea.height - PET_WINDOW_HEIGHT
+    width: PET_WINDOW.width,
+    height: PET_WINDOW.height,
+    x: Math.round(workArea.x + workArea.width / 2 - PET_WINDOW.width / 2),
+    y: workArea.y + workArea.height - PET_WINDOW.height
   };
 
   if (!stored) return fallback;
@@ -240,8 +238,8 @@ function persistPetPosition(): void {
 function createPetWindow(): void {
   const bounds = initialPetBounds();
   petWindow = new BrowserWindow({
-    width: PET_WINDOW_WIDTH,
-    height: PET_WINDOW_HEIGHT,
+    width: PET_WINDOW.width,
+    height: PET_WINDOW.height,
     x: bounds.x,
     y: bounds.y,
     transparent: true,
@@ -299,9 +297,9 @@ function createSettingsWindow(): void {
   }
 
   settingsWindow = new BrowserWindow({
-    width: SETTINGS_WINDOW_WIDTH,
-    height: SETTINGS_WINDOW_HEIGHT,
-    title: `Pawse ${text().menu.settings}`,
+    width: SETTINGS_WINDOW.width,
+    height: SETTINGS_WINDOW.height,
+    title: `${APP_NAME} ${text().menu.settings}`,
     resizable: false,
     show: false,
     webPreferences: {
@@ -323,19 +321,10 @@ function createSettingsWindow(): void {
   });
 }
 
-function trayImage(): Electron.NativeImage {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><path fill="black" d="M5.8 6.5c-.6 0-1.1-.7-1.1-1.6s.5-1.6 1.1-1.6 1.1.7 1.1 1.6-.5 1.6-1.1 1.6Zm6.4 0c-.6 0-1.1-.7-1.1-1.6s.5-1.6 1.1-1.6 1.1.7 1.1 1.6-.5 1.6-1.1 1.6ZM9 14.7c-3 0-5.1-1.7-5.1-4 0-1.8 1.2-3.2 2.8-3.2.9 0 1.5.4 2.3.4s1.4-.4 2.3-.4c1.6 0 2.8 1.4 2.8 3.2 0 2.3-2.1 4-5.1 4Zm0-2.3c.8 0 1.7-.4 1.7-1.1 0-.5-.4-.8-.9-.8-.3 0-.5.1-.8.1s-.5-.1-.8-.1c-.5 0-.9.3-.9.8 0 .7.9 1.1 1.7 1.1Z"/></svg>`;
-  const image = nativeImage.createFromDataURL(
-    `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`
-  );
-  image.setTemplateImage(true);
-  return image;
-}
-
 function createTray(): void {
-  tray = new Tray(trayImage());
-  tray.setTitle("Pawse");
-  tray.setToolTip("Pawse");
+  tray = new Tray(createTrayImage());
+  tray.setTitle(APP_NAME);
+  tray.setToolTip(APP_NAME);
   tray.on("click", () => {
     tray?.popUpContextMenu();
   });
@@ -387,7 +376,7 @@ function updateApplicationMenu(): void {
   const labels = text().menu;
   const template: Electron.MenuItemConstructorOptions[] = [
     {
-      label: "Pawse",
+      label: APP_NAME,
       submenu: [
         ...actionMenuItems(),
         { type: "separator" },
@@ -406,7 +395,7 @@ function updateTrayMenu(): void {
   if (!tray) return;
   const labels = text().menu;
   const template: Electron.MenuItemConstructorOptions[] = [
-    { label: "Pawse", enabled: false },
+    { label: APP_NAME, enabled: false },
     { type: "separator" },
     ...actionMenuItems(),
     { type: "separator" },
@@ -462,10 +451,10 @@ function pinToBottomRight(): void {
   if (!petWindow || petWindow.isDestroyed()) return;
   const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   petWindow.setBounds({
-    x: workArea.x + workArea.width - PET_WINDOW_WIDTH - 24,
-    y: workArea.y + workArea.height - PET_WINDOW_HEIGHT,
-    width: PET_WINDOW_WIDTH,
-    height: PET_WINDOW_HEIGHT
+    x: workArea.x + workArea.width - PET_WINDOW.width - 24,
+    y: workArea.y + workArea.height - PET_WINDOW.height,
+    width: PET_WINDOW.width,
+    height: PET_WINDOW.height
   });
 }
 
@@ -497,8 +486,8 @@ function movePetWithCursor(): void {
   if (!petWindow || petWindow.isDestroyed()) return;
   const cursor = screen.getCursorScreenPoint();
   const bounds = clampBoundsToWorkArea({
-    width: PET_WINDOW_WIDTH,
-    height: PET_WINDOW_HEIGHT,
+    width: PET_WINDOW.width,
+    height: PET_WINDOW.height,
     x: cursor.x - dragOffset.x,
     y: cursor.y - dragOffset.y
   });
@@ -508,8 +497,8 @@ function movePetWithCursor(): void {
 function startPetDrag(offset: { offsetX: number; offsetY: number }): void {
   if (focusActive || blockingMode || !petWindow || petWindow.isDestroyed()) return;
   dragOffset = {
-    x: Math.min(Math.max(Math.round(offset.offsetX), 0), PET_WINDOW_WIDTH),
-    y: Math.min(Math.max(Math.round(offset.offsetY), 0), PET_WINDOW_HEIGHT)
+    x: Math.min(Math.max(Math.round(offset.offsetX), 0), PET_WINDOW.width),
+    y: Math.min(Math.max(Math.round(offset.offsetY), 0), PET_WINDOW.height)
   };
   if (dragTimer) clearInterval(dragTimer);
   hideBubble();
@@ -535,7 +524,7 @@ function startMovement(): void {
     const bounds = petWindow.getBounds();
     let nextX = bounds.x + walkDirection * 2;
     const minX = workArea.x + 12;
-    const maxX = workArea.x + workArea.width - PET_WINDOW_WIDTH - 12;
+    const maxX = workArea.x + workArea.width - PET_WINDOW.width - 12;
 
     if (nextX <= minX) {
       nextX = minX;
@@ -549,7 +538,7 @@ function startMovement(): void {
     petWindow.setBounds({
       ...bounds,
       x: nextX,
-      y: workArea.y + workArea.height - PET_WINDOW_HEIGHT
+      y: workArea.y + workArea.height - PET_WINDOW.height
     });
   }, 70);
 }
@@ -592,78 +581,6 @@ function scheduleReminderTimers(): void {
 function setDistractionStatus(partial: Partial<DistractionStatus>): void {
   distractionStatus = { ...distractionStatus, ...partial };
   publishSnapshot();
-}
-
-function normalizeRule(value: string): string {
-  return value.trim().toLowerCase();
-}
-
-function activeWindowScript(): string {
-  return `
-tell application "System Events"
-  set frontAppProcess to first application process whose frontmost is true
-  set frontApp to name of frontAppProcess
-  set frontWindow to ""
-  try
-    set frontWindow to name of front window of frontAppProcess
-  end try
-end tell
-return frontApp & linefeed & frontWindow
-`;
-}
-
-function readActiveWindow(): Promise<{ appName: string; windowTitle: string }> {
-  return new Promise((resolve, reject) => {
-    execFile("/usr/bin/osascript", ["-e", activeWindowScript()], { timeout: 2500 }, (error, stdout) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      const [appName = "", ...titleParts] = stdout.trimEnd().split("\n");
-      resolve({
-        appName: appName.trim(),
-        windowTitle: titleParts.join("\n").trim()
-      });
-    });
-  });
-}
-
-function classifyDistraction(
-  active: { appName: string; windowTitle: string },
-  settings: Settings
-): string | null {
-  const appName = active.appName.trim();
-  const title = active.windowTitle.trim();
-  const appNameLower = appName.toLowerCase();
-  const titleLower = title.toLowerCase();
-
-  if (IGNORED_DISTRACTION_APPS.some((ignored) => ignored.toLowerCase() === appNameLower)) {
-    return null;
-  }
-
-  const blockedApp = settings.distractionBlockedApps
-    .map(normalizeRule)
-    .filter(Boolean)
-    .find((rule) => appNameLower.includes(rule));
-  if (blockedApp) return `app:${blockedApp}`;
-
-  const blockedKeyword = settings.distractionBlockedKeywords
-    .map(normalizeRule)
-    .filter(Boolean)
-    .find((rule) => titleLower.includes(rule) || appNameLower.includes(rule));
-  if (blockedKeyword) return `keyword:${blockedKeyword}`;
-
-  return null;
-}
-
-function isPermissionError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return (
-    message.includes("not allowed assistive access") ||
-    message.includes("System Events got an error") ||
-    message.includes("not authorized") ||
-    message.includes("Operation not permitted")
-  );
 }
 
 async function checkDistractionNow(): Promise<void> {
