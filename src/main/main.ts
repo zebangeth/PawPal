@@ -4,11 +4,11 @@ import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
-  COPY,
   createEmptyStats,
   DEFAULT_SETTINGS,
   todayKey
 } from "../shared/constants";
+import { i18n, resolveLanguage } from "../shared/i18n";
 import type {
   AppSnapshot,
   BlockingMode,
@@ -89,12 +89,19 @@ let distractionStatus: DistractionStatus = {
 };
 
 function getSettings(): Settings {
-  return { ...DEFAULT_SETTINGS, ...store.get("settings") };
+  const stored = store.get("settings");
+  return { ...DEFAULT_SETTINGS, ...stored, language: resolveLanguage(stored.language) };
+}
+
+function text(): ReturnType<typeof i18n> {
+  return i18n(getSettings().language);
 }
 
 function setSettings(next: Settings): void {
-  store.set("settings", next);
-  sendToAll("settings:updated", next);
+  const normalized = { ...next, language: resolveLanguage(next.language) };
+  store.set("settings", normalized);
+  sendToAll("settings:updated", normalized);
+  settingsWindow?.setTitle(`Pawse ${text().menu.settings}`);
   scheduleReminderTimers();
   scheduleDistractionDetection();
   updateTrayMenu();
@@ -294,7 +301,7 @@ function createSettingsWindow(): void {
   settingsWindow = new BrowserWindow({
     width: SETTINGS_WINDOW_WIDTH,
     height: SETTINGS_WINDOW_HEIGHT,
-    title: "Pawse Settings",
+    title: `Pawse ${text().menu.settings}`,
     resizable: false,
     show: false,
     webPreferences: {
@@ -337,9 +344,10 @@ function createTray(): void {
 
 function actionMenuItems(): Electron.MenuItemConstructorOptions[] {
   const dogVisible = Boolean(petWindow?.isVisible());
+  const labels = text().menu;
   return [
     {
-      label: dogVisible ? "Hide Dog" : "Show Dog",
+      label: dogVisible ? labels.hideDog : labels.showDog,
       click: () => {
         if (!petWindow) createPetWindow();
         if (!petWindow) return;
@@ -350,14 +358,14 @@ function actionMenuItems(): Electron.MenuItemConstructorOptions[] {
       }
     },
     {
-      label: focusActive ? "Stop Focus Mode" : "Start Focus Mode",
+      label: focusActive ? labels.stopFocusMode : labels.startFocusMode,
       click: () => {
         if (focusActive) stopFocusMode(true);
         else startFocusMode();
       }
     },
     {
-      label: petParked ? "Resume Walking" : "Park Dog Here",
+      label: petParked ? labels.resumeWalking : labels.parkDogHere,
       enabled: dogVisible && !focusActive,
       click: () => {
         if (petParked) resumeWalking();
@@ -365,24 +373,25 @@ function actionMenuItems(): Electron.MenuItemConstructorOptions[] {
       }
     },
     { type: "separator" },
-    { label: "Demo: Break Reminder", click: () => triggerDemo("break") },
-    { label: "Demo: Hydration Reminder", click: () => triggerDemo("hydration") },
-    { label: "Demo: Focus Warning", click: () => triggerDemo("focusWarning") },
-    { label: "Demo: Happy Reaction", click: () => triggerDemo("happy") },
+    { label: labels.demoBreakReminder, click: () => triggerDemo("break") },
+    { label: labels.demoHydrationReminder, click: () => triggerDemo("hydration") },
+    { label: labels.demoFocusWarning, click: () => triggerDemo("focusWarning") },
+    { label: labels.demoHappyReaction, click: () => triggerDemo("happy") },
     { type: "separator" },
-    { label: "Settings", click: createSettingsWindow },
-    { label: "Reset Today", click: resetTodayStats }
+    { label: labels.settings, click: createSettingsWindow },
+    { label: labels.resetToday, click: resetTodayStats }
   ];
 }
 
 function updateApplicationMenu(): void {
+  const labels = text().menu;
   const template: Electron.MenuItemConstructorOptions[] = [
     {
       label: "Pawse",
       submenu: [
         ...actionMenuItems(),
         { type: "separator" },
-        { role: "quit", label: "Quit" }
+        { role: "quit", label: labels.quit }
       ]
     },
     { role: "editMenu" },
@@ -395,13 +404,14 @@ function updateApplicationMenu(): void {
 function updateTrayMenu(): void {
   updateApplicationMenu();
   if (!tray) return;
+  const labels = text().menu;
   const template: Electron.MenuItemConstructorOptions[] = [
     { label: "Pawse", enabled: false },
     { type: "separator" },
     ...actionMenuItems(),
     { type: "separator" },
     {
-      label: "Quit",
+      label: labels.quit,
       click: () => {
         app.quit();
       }
@@ -411,17 +421,18 @@ function updateTrayMenu(): void {
 }
 
 function showPetContextMenu(): void {
+  const labels = text().menu;
   const template: Electron.MenuItemConstructorOptions[] = [
-    { label: "Settings", click: createSettingsWindow },
+    { label: labels.settings, click: createSettingsWindow },
     {
-      label: focusActive ? "Stop Focus Mode" : "Start Focus Mode",
+      label: focusActive ? labels.stopFocusMode : labels.startFocusMode,
       click: () => {
         if (focusActive) stopFocusMode(false);
         else startFocusMode();
       }
     },
     {
-      label: petParked ? "Resume Walking" : "Park Dog Here",
+      label: petParked ? labels.resumeWalking : labels.parkDogHere,
       enabled: !focusActive,
       click: () => {
         if (petParked) resumeWalking();
@@ -429,13 +440,13 @@ function showPetContextMenu(): void {
       }
     },
     { type: "separator" },
-    { label: "Demo: Break Reminder", click: () => triggerDemo("break") },
-    { label: "Demo: Hydration Reminder", click: () => triggerDemo("hydration") },
-    { label: "Demo: Focus Warning", click: () => triggerDemo("focusWarning") },
-    { label: "Demo: Happy Reaction", click: () => triggerDemo("happy") },
+    { label: labels.demoBreakReminder, click: () => triggerDemo("break") },
+    { label: labels.demoHydrationReminder, click: () => triggerDemo("hydration") },
+    { label: labels.demoFocusWarning, click: () => triggerDemo("focusWarning") },
+    { label: labels.demoHappyReaction, click: () => triggerDemo("happy") },
     { type: "separator" },
     {
-      label: "Hide Dog",
+      label: labels.hideDog,
       click: () => {
         petWindow?.hide();
         updateTrayMenu();
@@ -465,7 +476,7 @@ function parkPetHere(): void {
   persistPetPosition();
   if (!focusActive && !blockingMode) {
     setPetState("sitting");
-    showBubble({ id: "parked", message: COPY.parked, autoDismissMs: 1800 });
+    showBubble({ id: "parked", message: text().bubble.parked, autoDismissMs: 1800 });
   }
   updateTrayMenu();
   sendToAll("app:snapshot", snapshot());
@@ -476,7 +487,7 @@ function resumeWalking(): void {
   store.set("petParked", false);
   if (!focusActive && !blockingMode) {
     setPetState("walking");
-    showBubble({ id: "resume-walking", message: COPY.resumeWalking, autoDismissMs: 1600 });
+    showBubble({ id: "resume-walking", message: text().bubble.resumeWalking, autoDismissMs: 1600 });
   }
   updateTrayMenu();
   sendToAll("app:snapshot", snapshot());
@@ -715,7 +726,7 @@ function scheduleDistractionDetection(): void {
 
   setDistractionStatus({
     state: process.platform === "darwin" ? "watching" : "unsupported",
-    error: process.platform === "darwin" ? null : "Distraction detection currently supports macOS only."
+    error: process.platform === "darwin" ? null : text().system.unsupportedDistraction
   });
 
   if (process.platform !== "darwin") return;
@@ -740,7 +751,7 @@ function resumeLongTermState(): void {
   sendToAll("app:snapshot", snapshot());
 }
 
-function happyFeedback(message: string = COPY.woof, after?: () => void): void {
+function happyFeedback(message: string = text().bubble.woof, after?: () => void): void {
   if (blockingMode) return;
   const returnState = focusActive ? "focusGuard" : petParked ? "sitting" : "walking";
   setPetState("happy");
@@ -764,13 +775,14 @@ function triggerBreakReminder(fromDemo: boolean): void {
   breakDueAt = null;
   publishSnapshot();
   setPetState("knocking");
+  const labels = text();
   showBubble({
     id: "break",
-    message: COPY.breakReminder,
+    message: labels.bubble.breakReminder,
     actions: [
-      { id: "break:done", label: "我站起来了", kind: "primary" },
-      { id: "break:snooze", label: "10 分钟后提醒" },
-      { id: "break:mute", label: "今天先别管我", kind: "danger" }
+      { id: "break:done", label: labels.actions.breakDone, kind: "primary" },
+      { id: "break:snooze", label: labels.actions.breakSnooze },
+      { id: "break:mute", label: labels.actions.breakMute, kind: "danger" }
     ]
   });
 }
@@ -785,12 +797,13 @@ function triggerHydrationReminder(fromDemo: boolean): void {
   hydrationDueAt = null;
   publishSnapshot();
   setPetState("thirsty");
+  const labels = text();
   showBubble({
     id: "hydration",
-    message: COPY.hydrationReminder,
+    message: labels.bubble.hydrationReminder,
     actions: [
-      { id: "hydration:done", label: "我喝水了", kind: "primary" },
-      { id: "hydration:snooze", label: "稍后提醒" }
+      { id: "hydration:done", label: labels.actions.hydrationDone, kind: "primary" },
+      { id: "hydration:snooze", label: labels.actions.hydrationSnooze }
     ]
   });
 }
@@ -803,12 +816,13 @@ function triggerFocusWarning(): void {
   sendToAll("app:snapshot", snapshot());
   setPetState("focusGuard");
   pinToBottomRight();
+  const labels = text();
   showBubble({
     id: "focus-warning",
-    message: COPY.focusWarning,
+    message: labels.bubble.focusWarning,
     actions: [
-      { id: "focus:back", label: "回去工作", kind: "primary" },
-      { id: "focus:end", label: "结束 Focus" }
+      { id: "focus:back", label: labels.actions.focusBack, kind: "primary" },
+      { id: "focus:end", label: labels.actions.focusEnd }
     ]
   });
 }
@@ -828,7 +842,7 @@ function startFocusMode(): void {
   pinToBottomRight();
   showBubble({
     id: "focus-start",
-    message: COPY.focusStart.replace("25", String(settings.focusDurationMinutes)),
+    message: text().bubble.focusStart(settings.focusDurationMinutes),
     autoDismissMs: 4500
   });
   if (focusTimer) clearTimeout(focusTimer);
@@ -861,7 +875,7 @@ function stopFocusMode(completed: boolean): void {
   setPetState("happy");
   showBubble({
     id: "focus-complete",
-    message: completed ? COPY.focusComplete : "Focus 已结束，我先回去巡逻。",
+    message: completed ? text().bubble.focusComplete : text().bubble.focusCancelled,
     autoDismissMs: 2800
   });
   setTimeout(() => {
@@ -878,7 +892,7 @@ function triggerDemo(trigger: DemoTrigger): void {
   if (trigger === "break") triggerBreakReminder(true);
   if (trigger === "hydration") triggerHydrationReminder(true);
   if (trigger === "focusWarning") triggerFocusWarning();
-  if (trigger === "happy") happyFeedback("woof!");
+  if (trigger === "happy") happyFeedback(text().bubble.woof);
 }
 
 function handleBubbleAction(actionId: string): void {
@@ -886,7 +900,7 @@ function handleBubbleAction(actionId: string): void {
     updateStats((stats) => ({ ...stats, breaksTaken: stats.breaksTaken + 1 }));
     blockingMode = null;
     sendToAll("app:snapshot", snapshot());
-    happyFeedback(COPY.breakDone, scheduleReminderTimers);
+    happyFeedback(text().bubble.breakDone, scheduleReminderTimers);
     return;
   }
   if (actionId === "break:snooze") {
@@ -903,7 +917,7 @@ function handleBubbleAction(actionId: string): void {
     blockingMode = null;
     sendToAll("app:snapshot", snapshot());
     setPetState("annoyed");
-    showBubble({ id: "break-muted", message: COPY.breakIgnore, autoDismissMs: 2600 });
+    showBubble({ id: "break-muted", message: text().bubble.breakIgnore, autoDismissMs: 2600 });
     setTimeout(resumeLongTermState, 2700);
     return;
   }
@@ -912,8 +926,8 @@ function handleBubbleAction(actionId: string): void {
     blockingMode = null;
     sendToAll("app:snapshot", snapshot());
     setPetState("drinking");
-    showBubble({ id: "hydration-done", message: COPY.hydrationDone, autoDismissMs: 2300 });
-    setTimeout(() => happyFeedback(COPY.hydrationDone, scheduleReminderTimers), 2400);
+    showBubble({ id: "hydration-done", message: text().bubble.hydrationDone, autoDismissMs: 2300 });
+    setTimeout(() => happyFeedback(text().bubble.hydrationDone, scheduleReminderTimers), 2400);
     return;
   }
   if (actionId === "hydration:snooze") {
@@ -928,7 +942,7 @@ function handleBubbleAction(actionId: string): void {
     blockingMode = null;
     sendToAll("app:snapshot", snapshot());
     setPetState("focusGuard");
-    showBubble({ id: "focus-back", message: COPY.focusBack, autoDismissMs: 1800 });
+    showBubble({ id: "focus-back", message: text().bubble.focusBack, autoDismissMs: 1800 });
     setTimeout(() => {
       if (focusActive && !blockingMode) hideBubble();
     }, 1900);
@@ -943,7 +957,7 @@ function registerIpc(): void {
   ipcMain.handle("app:get-snapshot", () => snapshot());
   ipcMain.on("pet:clicked", () => {
     if (blockingMode) return;
-    happyFeedback(COPY.woof);
+    happyFeedback(text().bubble.woof);
   });
   ipcMain.on("pet:context-menu", showPetContextMenu);
   ipcMain.on("pet:drag-start", (_event, offset: { offsetX: number; offsetY: number }) =>

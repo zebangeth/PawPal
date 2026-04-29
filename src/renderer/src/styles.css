@@ -18,7 +18,9 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -214,6 +216,7 @@ h2 {
 
 .toggle-row,
 .number-row,
+.select-row,
 .list-row {
   align-items: center;
   display: flex;
@@ -235,15 +238,23 @@ h2 {
   width: 18px;
 }
 
-.number-row input {
+.number-row input,
+.select-row select {
   background: #fff;
   border: 1px solid rgba(45, 38, 31, 0.18);
   border-radius: 8px;
   color: #2d261f;
   height: 32px;
   padding: 4px 8px;
+}
+
+.number-row input {
   text-align: right;
   width: 86px;
+}
+
+.select-row select {
+  min-width: 132px;
 }
 
 .list-row textarea {

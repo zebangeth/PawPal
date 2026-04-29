@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { JSX, PointerEvent } from "react";
 import { DEFAULT_SETTINGS } from "../../shared/constants";
+import { i18n, LANGUAGE_OPTIONS, resolveLanguage } from "../../shared/i18n";
 import type {
   AppSnapshot,
   DemoTrigger,
+  Language,
   PetState,
   Settings,
   SpeechBubble,
@@ -110,39 +112,55 @@ function useNow(refreshMs = 30_000): number {
   return now;
 }
 
-function formatTimer(timestamp: number | null, now: number): string {
-  if (!timestamp) return "off";
+function localeFor(language: Language): string {
+  return language === "zh-CN" ? "zh-CN" : "en-US";
+}
+
+function formatTimer(
+  timestamp: number | null,
+  now: number,
+  language: Language,
+  labels: ReturnType<typeof i18n>["settings"]
+): string {
+  if (!timestamp) return labels.off;
   const remainingMs = timestamp - now;
-  const absolute = new Intl.DateTimeFormat(undefined, {
+  const absolute = new Intl.DateTimeFormat(localeFor(language), {
     hour: "2-digit",
     minute: "2-digit"
   }).format(timestamp);
-  if (remainingMs <= 0) return `${absolute} now`;
+  if (remainingMs <= 0) return `${absolute} ${labels.now}`;
   const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60_000));
   return `${absolute} (${remainingMinutes}m)`;
 }
 
-function formatTimestamp(timestamp: number | null): string {
-  if (!timestamp) return "never";
-  return new Intl.DateTimeFormat(undefined, {
+function formatTimestamp(
+  timestamp: number | null,
+  language: Language,
+  labels: ReturnType<typeof i18n>["settings"]
+): string {
+  if (!timestamp) return labels.never;
+  return new Intl.DateTimeFormat(localeFor(language), {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit"
   }).format(timestamp);
 }
 
-function distractionHelp(snapshot: AppSnapshot): string {
+function distractionHelp(
+  snapshot: AppSnapshot,
+  labels: ReturnType<typeof i18n>["settings"]
+): string {
   if (!snapshot.settings.distractionDetectionEnabled) {
-    return "Detection is off. Enable it and Save to preview the active window.";
+    return labels.detectionOffHelp;
   }
   if (snapshot.distraction.error) return snapshot.distraction.error;
   if (!snapshot.distraction.lastCheckedAt) {
-    return "Waiting for the first active-window check.";
+    return labels.detectionWaitingHelp;
   }
   if (!snapshot.focusActive) {
-    return "Previewing the active window. Start Focus to trigger warnings from matched rules.";
+    return labels.detectionPreviewHelp;
   }
-  return "Watching during Focus. Matched blocked apps or keywords will trigger a warning.";
+  return labels.detectionFocusHelp;
 }
 
 function PetView(): JSX.Element {
@@ -150,6 +168,7 @@ function PetView(): JSX.Element {
   const [bubble, setBubble] = useState<SpeechBubble | null>(null);
   const assetUrls = useMemo(createAssetUrls, []);
   const dragRef = useRef<DragRef | null>(null);
+  const labels = i18n(resolveLanguage(snapshot.settings.language)).settings;
 
   useEffect(() => {
     const offBubble = window.pawse.onShowBubble(setBubble);
@@ -235,7 +254,7 @@ function PetView(): JSX.Element {
       ) : null}
 
       {snapshot.focusActive && state === "focusGuard" ? (
-        <div className="focus-badge">Focus</div>
+        <div className="focus-badge">{labels.focus}</div>
       ) : null}
 
       <button
@@ -296,6 +315,31 @@ function NumberField({
   );
 }
 
+function SelectField({
+  label,
+  value,
+  options,
+  onChange
+}: {
+  label: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+}): JSX.Element {
+  return (
+    <label className="select-row">
+      <span>{label}</span>
+      <select value={value} onChange={(event) => onChange(event.target.value)}>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function ListField({
   label,
   value,
@@ -344,6 +388,8 @@ function SettingsView(): JSX.Element {
   const [settingsDirty, setSettingsDirty] = useState(false);
   const now = useNow();
   const savedSettingsKey = JSON.stringify(settings);
+  const language = resolveLanguage(draft.language);
+  const labels = i18n(language).settings;
 
   useEffect(() => {
     setDraft(settings);
@@ -364,30 +410,39 @@ function SettingsView(): JSX.Element {
     <main className="settings-shell">
       <header>
         <p className="eyebrow">Pawse</p>
-        <h1>Settings</h1>
+        <h1>{labels.title}</h1>
       </header>
 
       <section className="settings-section">
-        <h2>Reminders</h2>
+        <SelectField
+          label={labels.language}
+          value={language}
+          options={LANGUAGE_OPTIONS}
+          onChange={(value) => updateDraft({ language: resolveLanguage(value) })}
+        />
+      </section>
+
+      <section className="settings-section">
+        <h2>{labels.reminders}</h2>
         <ToggleField
-          label="Enable Break Reminder"
+          label={labels.enableBreakReminder}
           checked={draft.breakReminderEnabled}
           onChange={(breakReminderEnabled) => updateDraft({ breakReminderEnabled })}
         />
         <NumberField
-          label="Break Interval"
+          label={labels.breakInterval}
           value={draft.breakIntervalMinutes}
           min={1}
           max={180}
           onChange={(breakIntervalMinutes) => updateDraft({ breakIntervalMinutes })}
         />
         <ToggleField
-          label="Enable Hydration Reminder"
+          label={labels.enableHydrationReminder}
           checked={draft.hydrationReminderEnabled}
           onChange={(hydrationReminderEnabled) => updateDraft({ hydrationReminderEnabled })}
         />
         <NumberField
-          label="Hydration Interval"
+          label={labels.hydrationInterval}
           value={draft.hydrationIntervalMinutes}
           min={1}
           max={240}
@@ -396,132 +451,132 @@ function SettingsView(): JSX.Element {
       </section>
 
       <section className="settings-section">
-        <h2>Focus</h2>
+        <h2>{labels.focus}</h2>
         <NumberField
-          label="Focus Duration"
+          label={labels.focusDuration}
           value={draft.focusDurationMinutes}
           min={1}
           max={120}
           onChange={(focusDurationMinutes) => updateDraft({ focusDurationMinutes })}
         />
         <ToggleField
-          label="Enable Distraction Detection"
+          label={labels.enableDistractionDetection}
           checked={draft.distractionDetectionEnabled}
           onChange={(distractionDetectionEnabled) => updateDraft({ distractionDetectionEnabled })}
         />
         <NumberField
-          label="Detection Grace"
+          label={labels.detectionGrace}
           value={draft.distractionGraceSeconds}
           min={0}
           max={120}
           onChange={(distractionGraceSeconds) => updateDraft({ distractionGraceSeconds })}
         />
         <ListField
-          label="Blocked Apps"
+          label={labels.blockedApps}
           value={draft.distractionBlockedApps}
           onChange={(distractionBlockedApps) => updateDraft({ distractionBlockedApps })}
         />
         <ListField
-          label="Blocked Keywords"
+          label={labels.blockedKeywords}
           value={draft.distractionBlockedKeywords}
           onChange={(distractionBlockedKeywords) => updateDraft({ distractionBlockedKeywords })}
         />
         <ToggleField
-          label="Enable Sound Effects"
+          label={labels.enableSoundEffects}
           checked={draft.soundEnabled}
           onChange={(soundEnabled) => updateDraft({ soundEnabled })}
         />
       </section>
 
       <section className="settings-section">
-        <h2>Today</h2>
+        <h2>{labels.today}</h2>
         <dl className="stats-grid">
           <div>
-            <dt>Breaks</dt>
+            <dt>{labels.breaks}</dt>
             <dd>{stats.breaksTaken}</dd>
           </div>
           <div>
-            <dt>Waters</dt>
+            <dt>{labels.waters}</dt>
             <dd>{stats.watersLogged}</dd>
           </div>
           <div>
-            <dt>Focus min</dt>
+            <dt>{labels.focusMin}</dt>
             <dd>{stats.focusMinutes}</dd>
           </div>
           <div>
-            <dt>Warnings</dt>
+            <dt>{labels.warnings}</dt>
             <dd>{stats.focusWarnings}</dd>
           </div>
         </dl>
       </section>
 
       <section className="settings-section">
-        <h2>Runtime</h2>
+        <h2>{labels.runtime}</h2>
         <dl className="runtime-grid">
           <div>
-            <dt>State</dt>
+            <dt>{labels.state}</dt>
             <dd>{snapshot.petState}</dd>
           </div>
           <div>
-            <dt>Mode</dt>
-            <dd>{snapshot.focusActive ? "focus" : snapshot.petParked ? "parked" : "walking"}</dd>
+            <dt>{labels.mode}</dt>
+            <dd>{snapshot.focusActive ? labels.focus : snapshot.petParked ? labels.parked : labels.walking}</dd>
           </div>
           <div>
-            <dt>Reminder</dt>
-            <dd>{snapshot.blockingMode ?? "none"}</dd>
+            <dt>{labels.reminder}</dt>
+            <dd>{snapshot.blockingMode ?? labels.none}</dd>
           </div>
           <div>
-            <dt>Dog</dt>
-            <dd>{snapshot.dogVisible ? "visible" : "hidden"}</dd>
+            <dt>{labels.dog}</dt>
+            <dd>{snapshot.dogVisible ? labels.visible : labels.hidden}</dd>
           </div>
         </dl>
       </section>
 
       <section className="settings-section">
-        <h2>Distraction</h2>
+        <h2>{labels.distraction}</h2>
         <dl className="runtime-grid">
           <div>
-            <dt>Status</dt>
+            <dt>{labels.status}</dt>
             <dd>{snapshot.distraction.state}</dd>
           </div>
           <div>
-            <dt>Matched</dt>
-            <dd>{snapshot.distraction.matchedRule ?? "none"}</dd>
+            <dt>{labels.matched}</dt>
+            <dd>{snapshot.distraction.matchedRule ?? labels.none}</dd>
           </div>
           <div>
-            <dt>App</dt>
-            <dd>{snapshot.distraction.activeApp || "none"}</dd>
+            <dt>{labels.app}</dt>
+            <dd>{snapshot.distraction.activeApp || labels.none}</dd>
           </div>
           <div>
-            <dt>Checked</dt>
-            <dd>{formatTimestamp(snapshot.distraction.lastCheckedAt)}</dd>
+            <dt>{labels.checked}</dt>
+            <dd>{formatTimestamp(snapshot.distraction.lastCheckedAt, language, labels)}</dd>
           </div>
         </dl>
         <p className="diagnostic-copy">
-          {snapshot.distraction.activeWindowTitle || "No active window title captured yet."}
+          {snapshot.distraction.activeWindowTitle || labels.noActiveWindowTitle}
         </p>
-        <p className="diagnostic-copy warning-copy">{distractionHelp(snapshot)}</p>
+        <p className="diagnostic-copy warning-copy">{distractionHelp(snapshot, labels)}</p>
       </section>
 
       <section className="settings-section">
-        <h2>Timers</h2>
+        <h2>{labels.timers}</h2>
         <dl className="runtime-grid">
           <div>
-            <dt>Break</dt>
-            <dd>{formatTimer(snapshot.timers.breakDueAt, now)}</dd>
+            <dt>{labels.break}</dt>
+            <dd>{formatTimer(snapshot.timers.breakDueAt, now, language, labels)}</dd>
           </div>
           <div>
-            <dt>Water</dt>
-            <dd>{formatTimer(snapshot.timers.hydrationDueAt, now)}</dd>
+            <dt>{labels.water}</dt>
+            <dd>{formatTimer(snapshot.timers.hydrationDueAt, now, language, labels)}</dd>
           </div>
           <div>
-            <dt>Focus End</dt>
-            <dd>{formatTimer(snapshot.timers.focusEndsAt, now)}</dd>
+            <dt>{labels.focusEnd}</dt>
+            <dd>{formatTimer(snapshot.timers.focusEndsAt, now, language, labels)}</dd>
           </div>
           <div>
-            <dt>Updated</dt>
+            <dt>{labels.updated}</dt>
             <dd>
-              {new Intl.DateTimeFormat(undefined, {
+              {new Intl.DateTimeFormat(localeFor(language), {
                 hour: "2-digit",
                 minute: "2-digit"
               }).format(now)}
@@ -531,30 +586,30 @@ function SettingsView(): JSX.Element {
       </section>
 
       <section className="settings-section">
-        <h2>Demo</h2>
+        <h2>{labels.demo}</h2>
         <div className="demo-grid">
-          <DemoButton trigger="break">Break</DemoButton>
-          <DemoButton trigger="hydration">Water</DemoButton>
-          <DemoButton trigger="focusWarning">Focus Warning</DemoButton>
-          <DemoButton trigger="happy">Happy</DemoButton>
+          <DemoButton trigger="break">{labels.demoBreak}</DemoButton>
+          <DemoButton trigger="hydration">{labels.demoWater}</DemoButton>
+          <DemoButton trigger="focusWarning">{labels.demoFocusWarning}</DemoButton>
+          <DemoButton trigger="happy">{labels.demoHappy}</DemoButton>
         </div>
       </section>
 
       <footer className="settings-actions">
         <button className="secondary-action" type="button" onClick={window.pawse.resetToday}>
-          Reset Today
+          {labels.resetToday}
         </button>
         <button className="secondary-action" type="button" onClick={window.pawse.startFocus}>
-          Start Focus
+          {labels.startFocus}
         </button>
         <button className="secondary-action" type="button" onClick={window.pawse.stopFocus}>
-          Stop Focus
+          {labels.stopFocus}
         </button>
         <button className="secondary-action" type="button" onClick={window.pawse.resumeWalking}>
-          Resume Walk
+          {labels.resumeWalk}
         </button>
         <button className="primary-action" type="button" disabled={!settingsDirty} onClick={save}>
-          Save
+          {labels.save}
         </button>
       </footer>
     </main>
@@ -563,17 +618,15 @@ function SettingsView(): JSX.Element {
 
 export default function App(): JSX.Element {
   if (!pawseApi()) {
+    const labels = i18n("zh-CN").settings;
     return (
       <main className="settings-shell">
         <header>
           <p className="eyebrow">Pawse</p>
-          <h1>Preload unavailable</h1>
+          <h1>{labels.preloadUnavailable}</h1>
         </header>
         <section className="settings-section">
-          <p className="diagnostic-copy">
-            Electron preload 没有注入，桌宠控制接口暂时不可用。请重启 pnpm dev，或检查
-            preload 路径和 sandbox 设置。
-          </p>
+          <p className="diagnostic-copy">{labels.preloadCopy}</p>
         </section>
       </main>
     );

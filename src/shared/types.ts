@@ -1,3 +1,5 @@
+export type Language = "zh-CN" | "en";
+
 export type PetState =
   | "walking"
   | "idle"
@@ -25,6 +27,7 @@ export type SpeechBubble = {
 export type BlockingMode = "break" | "hydration" | "focusWarning" | null;
 
 export type Settings = {
+  language: Language;
   breakReminderEnabled: boolean;
   breakIntervalMinutes: number;
   hydrationReminderEnabled: boolean;

@@ -1,0 +1,231 @@
+import type { Language } from "./types";
+
+export const LANGUAGE_OPTIONS: Array<{ value: Language; label: string }> = [
+  { value: "zh-CN", label: "中文" },
+  { value: "en", label: "English" }
+];
+
+export function resolveLanguage(value: unknown): Language {
+  return value === "en" ? "en" : "zh-CN";
+}
+
+export const I18N = {
+  "zh-CN": {
+    bubble: {
+      woof: "woof!",
+      breakReminder: "你坐太久啦，陪我站起来走一分钟吧",
+      breakDone: "好耶，尾巴批准！",
+      breakIgnore: "好吧……但我会担心你的。",
+      hydrationReminder: "我有点渴了……你也喝口水吧？",
+      hydrationDone: "补水成功！",
+      focusStart: (minutes: number) => `我会帮你守住这 ${minutes} 分钟。`,
+      focusWarning: "嘿，说好专注的",
+      focusComplete: "守护成功！尾巴批准。",
+      focusCancelled: "专注已结束，我先回去巡逻。",
+      focusBack: "好，我继续守着。",
+      parked: "好，我就在这里待着。",
+      resumeWalking: "我继续巡逻啦。"
+    },
+    actions: {
+      breakDone: "我站起来了",
+      breakSnooze: "10 分钟后提醒",
+      breakMute: "今天先别管我",
+      hydrationDone: "我喝水了",
+      hydrationSnooze: "稍后提醒",
+      focusBack: "回去工作",
+      focusEnd: "结束专注"
+    },
+    menu: {
+      showDog: "显示小狗",
+      hideDog: "隐藏小狗",
+      startFocusMode: "开始专注模式",
+      stopFocusMode: "停止专注模式",
+      parkDogHere: "让小狗待在这里",
+      resumeWalking: "继续巡逻",
+      demoBreakReminder: "演示：休息提醒",
+      demoHydrationReminder: "演示：喝水提醒",
+      demoFocusWarning: "演示：分心警告",
+      demoHappyReaction: "演示：开心反馈",
+      settings: "设置",
+      resetToday: "重置今日",
+      quit: "退出"
+    },
+    settings: {
+      title: "设置",
+      language: "语言",
+      reminders: "提醒",
+      enableBreakReminder: "开启休息提醒",
+      breakInterval: "休息间隔",
+      enableHydrationReminder: "开启喝水提醒",
+      hydrationInterval: "喝水间隔",
+      focus: "专注",
+      focusDuration: "专注时长",
+      enableDistractionDetection: "开启分心检测",
+      detectionGrace: "检测宽限时间",
+      blockedApps: "屏蔽应用",
+      blockedKeywords: "屏蔽关键词",
+      enableSoundEffects: "开启音效",
+      today: "今日",
+      breaks: "休息",
+      waters: "喝水",
+      focusMin: "专注分钟",
+      warnings: "警告",
+      runtime: "运行状态",
+      state: "状态",
+      mode: "模式",
+      reminder: "提醒",
+      dog: "小狗",
+      distraction: "分心检测",
+      status: "状态",
+      matched: "命中",
+      app: "应用",
+      checked: "检查时间",
+      timers: "计时器",
+      break: "休息",
+      water: "喝水",
+      focusEnd: "专注结束",
+      updated: "更新",
+      demo: "演示",
+      demoBreak: "休息",
+      demoWater: "喝水",
+      demoFocusWarning: "专注警告",
+      demoHappy: "开心",
+      resetToday: "重置今日",
+      startFocus: "开始专注",
+      stopFocus: "停止专注",
+      resumeWalk: "继续巡逻",
+      save: "保存",
+      preloadUnavailable: "Preload 不可用",
+      preloadCopy:
+        "Electron preload 没有注入，桌宠控制接口暂时不可用。请重启 pnpm dev，或检查 preload 路径和 sandbox 设置。",
+      off: "关闭",
+      now: "现在",
+      never: "从未",
+      none: "无",
+      visible: "显示",
+      hidden: "隐藏",
+      parked: "停留",
+      walking: "巡逻",
+      noActiveWindowTitle: "还没有捕获到当前窗口标题。",
+      detectionOffHelp: "分心检测已关闭。开启后保存，即可预览当前活动窗口。",
+      detectionWaitingHelp: "正在等待第一次活动窗口检查。",
+      detectionPreviewHelp: "正在预览当前活动窗口。开始专注后，命中规则会触发警告。",
+      detectionFocusHelp: "专注期间正在检测。命中屏蔽应用或关键词会触发警告。"
+    },
+    system: {
+      unsupportedDistraction: "分心检测目前仅支持 macOS。"
+    }
+  },
+  en: {
+    bubble: {
+      woof: "woof!",
+      breakReminder: "You've been sitting for a while. Stand up with me for one minute?",
+      breakDone: "Nice. Tail approved.",
+      breakIgnore: "Okay... but I will worry about you.",
+      hydrationReminder: "I'm a little thirsty. You should take a sip too.",
+      hydrationDone: "Hydration logged.",
+      focusStart: (minutes: number) => `I'll guard these ${minutes} minutes for you.`,
+      focusWarning: "Hey, we agreed to stay focused.",
+      focusComplete: "Focus protected. Tail approved.",
+      focusCancelled: "Focus is over. I'll go back to patrol.",
+      focusBack: "Good. I'll keep guarding.",
+      parked: "Okay, I'll stay right here.",
+      resumeWalking: "Back to patrol."
+    },
+    actions: {
+      breakDone: "I stood up",
+      breakSnooze: "Remind in 10 min",
+      breakMute: "Leave me today",
+      hydrationDone: "I drank water",
+      hydrationSnooze: "Remind later",
+      focusBack: "Back to work",
+      focusEnd: "End Focus"
+    },
+    menu: {
+      showDog: "Show Dog",
+      hideDog: "Hide Dog",
+      startFocusMode: "Start Focus Mode",
+      stopFocusMode: "Stop Focus Mode",
+      parkDogHere: "Park Dog Here",
+      resumeWalking: "Resume Walking",
+      demoBreakReminder: "Demo: Break Reminder",
+      demoHydrationReminder: "Demo: Hydration Reminder",
+      demoFocusWarning: "Demo: Focus Warning",
+      demoHappyReaction: "Demo: Happy Reaction",
+      settings: "Settings",
+      resetToday: "Reset Today",
+      quit: "Quit"
+    },
+    settings: {
+      title: "Settings",
+      language: "Language",
+      reminders: "Reminders",
+      enableBreakReminder: "Enable Break Reminder",
+      breakInterval: "Break Interval",
+      enableHydrationReminder: "Enable Hydration Reminder",
+      hydrationInterval: "Hydration Interval",
+      focus: "Focus",
+      focusDuration: "Focus Duration",
+      enableDistractionDetection: "Enable Distraction Detection",
+      detectionGrace: "Detection Grace",
+      blockedApps: "Blocked Apps",
+      blockedKeywords: "Blocked Keywords",
+      enableSoundEffects: "Enable Sound Effects",
+      today: "Today",
+      breaks: "Breaks",
+      waters: "Waters",
+      focusMin: "Focus min",
+      warnings: "Warnings",
+      runtime: "Runtime",
+      state: "State",
+      mode: "Mode",
+      reminder: "Reminder",
+      dog: "Dog",
+      distraction: "Distraction",
+      status: "Status",
+      matched: "Matched",
+      app: "App",
+      checked: "Checked",
+      timers: "Timers",
+      break: "Break",
+      water: "Water",
+      focusEnd: "Focus End",
+      updated: "Updated",
+      demo: "Demo",
+      demoBreak: "Break",
+      demoWater: "Water",
+      demoFocusWarning: "Focus Warning",
+      demoHappy: "Happy",
+      resetToday: "Reset Today",
+      startFocus: "Start Focus",
+      stopFocus: "Stop Focus",
+      resumeWalk: "Resume Walk",
+      save: "Save",
+      preloadUnavailable: "Preload unavailable",
+      preloadCopy:
+        "Electron preload was not injected, so the pet control API is unavailable. Restart pnpm dev, or check the preload path and sandbox settings.",
+      off: "off",
+      now: "now",
+      never: "never",
+      none: "none",
+      visible: "visible",
+      hidden: "hidden",
+      parked: "parked",
+      walking: "walking",
+      noActiveWindowTitle: "No active window title captured yet.",
+      detectionOffHelp: "Detection is off. Enable it and Save to preview the active window.",
+      detectionWaitingHelp: "Waiting for the first active-window check.",
+      detectionPreviewHelp:
+        "Previewing the active window. Start Focus to trigger warnings from matched rules.",
+      detectionFocusHelp:
+        "Watching during Focus. Matched blocked apps or keywords will trigger a warning."
+    },
+    system: {
+      unsupportedDistraction: "Distraction detection currently supports macOS only."
+    }
+  }
+} as const;
+
+export function i18n(language: Language): (typeof I18N)[Language] {
+  return I18N[language];
+}
