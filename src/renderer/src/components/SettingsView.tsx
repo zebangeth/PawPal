@@ -1,23 +1,216 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { JSX } from "react";
 import { i18n, LANGUAGE_OPTIONS, resolveLanguage } from "../../../shared/i18n";
 import { petAppearanceOptions, resolvePetAppearanceId } from "../../../shared/petAppearances";
-import type { DemoTrigger, Settings } from "../../../shared/types";
+import type { DemoTrigger, Language, Settings } from "../../../shared/types";
+import { getPetAsset } from "../assets";
 import { distractionHelp, formatDistractionState, formatTimer, formatTimestamp, localeFor } from "../format";
 import { useNow, useSnapshot } from "../hooks";
-import { ListField, NumberField, SelectField, ToggleField } from "./FormFields";
 
-function DemoButton({
-  trigger,
-  children
+type SettingsCopy = ReturnType<typeof i18n>["settings"];
+
+function Row({
+  label,
+  hint,
+  control
 }: {
-  trigger: DemoTrigger;
-  children: string;
+  label: string;
+  hint?: string;
+  control: JSX.Element;
 }): JSX.Element {
   return (
-    <button className="command-button" type="button" onClick={() => window.pawse.triggerDemo(trigger)}>
-      {children}
+    <div className="pref-row">
+      <div className="pref-row__label">
+        <span>{label}</span>
+        {hint ? <small>{hint}</small> : null}
+      </div>
+      <div className="pref-row__control">{control}</div>
+    </div>
+  );
+}
+
+function ToggleControl({
+  checked,
+  onChange,
+  ariaLabel
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  ariaLabel: string;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={ariaLabel}
+      className={`pref-toggle${checked ? " is-on" : ""}`}
+      onClick={() => onChange(!checked)}
+    >
+      <span className="pref-toggle__thumb" />
     </button>
+  );
+}
+
+function NumberControl({
+  value,
+  min,
+  max,
+  unit,
+  onChange
+}: {
+  value: number;
+  min: number;
+  max: number;
+  unit: string;
+  onChange: (next: number) => void;
+}): JSX.Element {
+  return (
+    <div className="pref-stepper">
+      <button
+        type="button"
+        className="pref-stepper__btn"
+        aria-label="−"
+        disabled={value <= min}
+        onClick={() => onChange(Math.max(min, value - 1))}
+      >
+        −
+      </button>
+      <input
+        type="number"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(event) => {
+          const next = Number(event.target.value);
+          if (Number.isFinite(next)) onChange(Math.min(max, Math.max(min, next)));
+        }}
+      />
+      <span className="pref-stepper__unit">{unit}</span>
+      <button
+        type="button"
+        className="pref-stepper__btn"
+        aria-label="+"
+        disabled={value >= max}
+        onClick={() => onChange(Math.min(max, value + 1))}
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
+function SelectControl({
+  value,
+  options,
+  onChange
+}: {
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+}): JSX.Element {
+  return (
+    <select className="pref-select" value={value} onChange={(event) => onChange(event.target.value)}>
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function ChipsControl({
+  value,
+  onChange,
+  placeholder
+}: {
+  value: string[];
+  onChange: (next: string[]) => void;
+  placeholder: string;
+}): JSX.Element {
+  const [draft, setDraft] = useState("");
+
+  function commit(raw: string): void {
+    const trimmed = raw.trim().replace(/,$/, "").trim();
+    if (!trimmed) return;
+    if (value.some((entry) => entry.toLowerCase() === trimmed.toLowerCase())) {
+      setDraft("");
+      return;
+    }
+    onChange([...value, trimmed]);
+    setDraft("");
+  }
+
+  return (
+    <div className="pref-chips">
+      <div className="pref-chips__list">
+        {value.map((entry) => (
+          <span key={entry} className="pref-chip">
+            {entry}
+            <button
+              type="button"
+              aria-label={`Remove ${entry}`}
+              onClick={() => onChange(value.filter((item) => item !== entry))}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        <input
+          className="pref-chips__input"
+          placeholder={placeholder}
+          value={draft}
+          onChange={(event) => {
+            const next = event.target.value;
+            if (next.endsWith(",")) commit(next);
+            else setDraft(next);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              commit(draft);
+            }
+            if (event.key === "Backspace" && !draft && value.length) {
+              onChange(value.slice(0, -1));
+            }
+          }}
+          onBlur={() => commit(draft)}
+        />
+      </div>
+    </div>
+  );
+}
+
+function TodayLine({
+  stats,
+  language,
+  labels,
+  onReset
+}: {
+  stats: { breaksTaken: number; watersLogged: number; focusMinutes: number; focusWarnings: number };
+  language: Language;
+  labels: SettingsCopy;
+  onReset: () => void;
+}): JSX.Element {
+  const sentence =
+    language === "zh-CN"
+      ? `今天你已经休息 ${stats.breaksTaken} 次，喝水 ${stats.watersLogged} 杯，专注 ${stats.focusMinutes} 分钟。`
+      : `Today: ${stats.breaksTaken} breaks, ${stats.watersLogged} waters, ${stats.focusMinutes} focus min.`;
+  const warningSentence =
+    stats.focusWarnings > 0
+      ? language === "zh-CN"
+        ? ` 我提醒过你 ${stats.focusWarnings} 次。`
+        : ` I nudged you ${stats.focusWarnings} times.`
+      : "";
+  return (
+    <p className="today-line">
+      {sentence}
+      {warningSentence}
+      <button type="button" className="text-link" onClick={onReset}>
+        {labels.resetToday}
+      </button>
+    </p>
   );
 }
 
@@ -31,6 +224,11 @@ export function SettingsView(): JSX.Element {
   const savedSettingsKey = JSON.stringify(settings);
   const language = resolveLanguage(draft.language);
   const labels = i18n(language).settings;
+
+  const petAvatar = useMemo(
+    () => getPetAsset(resolvePetAppearanceId(draft.petAppearanceId), "happy"),
+    [draft.petAppearanceId]
+  );
 
   useEffect(() => {
     setDraft(settings);
@@ -51,248 +249,302 @@ export function SettingsView(): JSX.Element {
     setSettingsDirty(true);
   }
 
+  const minuteUnit = language === "zh-CN" ? "分钟" : "min";
+  const secondUnit = language === "zh-CN" ? "秒" : "s";
+
   return (
-    <main className="settings-shell">
-      <header className="settings-hero">
-        <div>
-          <p className="eyebrow">Pawse</p>
-          <h1>{labels.title}</h1>
-        </div>
-        <div className="save-status" aria-live="polite">
-          {settingsDirty ? labels.saving : labels.autoSaved}
+    <main className="prefs">
+      <header className="prefs__head">
+        <img className="prefs__avatar" src={petAvatar.src} alt="" />
+        <div className="prefs__intro">
+          <TodayLine
+            stats={stats}
+            language={language}
+            labels={labels}
+            onReset={window.pawse.resetToday}
+          />
+          <p className={`prefs__save ${settingsDirty ? "is-saving" : ""}`} aria-live="polite">
+            {settingsDirty ? labels.saving : labels.autoSaved}
+          </p>
         </div>
       </header>
 
       {!draft.onboardingDismissed ? (
-        <section className="onboarding-card">
-          <div>
-            <h2>{labels.welcomeTitle}</h2>
-            <p>{labels.welcomeCopy}</p>
-          </div>
+        <aside className="prefs__welcome">
+          <p>
+            <strong>{labels.welcomeTitle}.</strong> {labels.welcomeCopy}
+          </p>
           <button
-            className="secondary-action"
             type="button"
+            className="text-link"
             onClick={() => updateDraft({ onboardingDismissed: true })}
           >
             {labels.dismissWelcome}
           </button>
-        </section>
+        </aside>
       ) : null}
 
-      <section className="settings-summary">
-        <div className="summary-card">
-          <span>{labels.breaks}</span>
-          <strong>{stats.breaksTaken}</strong>
-        </div>
-        <div className="summary-card">
-          <span>{labels.waters}</span>
-          <strong>{stats.watersLogged}</strong>
-        </div>
-        <div className="summary-card">
-          <span>{labels.focusMin}</span>
-          <strong>{stats.focusMinutes}</strong>
-        </div>
-        <div className="summary-card">
-          <span>{labels.warnings}</span>
-          <strong>{stats.focusWarnings}</strong>
-        </div>
-      </section>
-
-      <div className="settings-content">
-        <div className="settings-main">
-          <section className="settings-panel">
-            <h2>{labels.appearance}</h2>
-            <SelectField
-              label={labels.language}
+      <section className="prefs__group">
+        <h2 className="prefs__group-title">{labels.appearance}</h2>
+        <Row
+          label={labels.language}
+          control={
+            <SelectControl
               value={language}
-              options={LANGUAGE_OPTIONS}
+              options={[...LANGUAGE_OPTIONS]}
               onChange={(value) => updateDraft({ language: resolveLanguage(value) })}
             />
-            <SelectField
-              label={labels.petAppearance}
+          }
+        />
+        <Row
+          label={labels.petAppearance}
+          control={
+            <SelectControl
               value={resolvePetAppearanceId(draft.petAppearanceId)}
               options={petAppearanceOptions(language)}
               onChange={(value) => updateDraft({ petAppearanceId: resolvePetAppearanceId(value) })}
             />
-          </section>
+          }
+        />
+        <Row
+          label={labels.enableSoundEffects}
+          control={
+            <ToggleControl
+              checked={draft.soundEnabled}
+              onChange={(soundEnabled) => updateDraft({ soundEnabled })}
+              ariaLabel={labels.enableSoundEffects}
+            />
+          }
+        />
+      </section>
 
-          <section className="settings-panel">
-            <h2>{labels.reminders}</h2>
-            <ToggleField
-              label={labels.enableBreakReminder}
+      <section className="prefs__group">
+        <h2 className="prefs__group-title">{labels.reminders}</h2>
+        <Row
+          label={labels.enableBreakReminder}
+          control={
+            <ToggleControl
               checked={draft.breakReminderEnabled}
               onChange={(breakReminderEnabled) => updateDraft({ breakReminderEnabled })}
+              ariaLabel={labels.enableBreakReminder}
             />
-            <NumberField
-              label={labels.breakInterval}
+          }
+        />
+        <Row
+          label={labels.breakInterval}
+          control={
+            <NumberControl
               value={draft.breakIntervalMinutes}
               min={1}
               max={180}
+              unit={minuteUnit}
               onChange={(breakIntervalMinutes) => updateDraft({ breakIntervalMinutes })}
             />
-            <ToggleField
-              label={labels.enableHydrationReminder}
+          }
+        />
+        <Row
+          label={labels.enableHydrationReminder}
+          control={
+            <ToggleControl
               checked={draft.hydrationReminderEnabled}
               onChange={(hydrationReminderEnabled) => updateDraft({ hydrationReminderEnabled })}
+              ariaLabel={labels.enableHydrationReminder}
             />
-            <NumberField
-              label={labels.hydrationInterval}
+          }
+        />
+        <Row
+          label={labels.hydrationInterval}
+          control={
+            <NumberControl
               value={draft.hydrationIntervalMinutes}
               min={1}
               max={240}
+              unit={minuteUnit}
               onChange={(hydrationIntervalMinutes) => updateDraft({ hydrationIntervalMinutes })}
             />
-          </section>
+          }
+        />
+        <div className="prefs__inline-actions">
+          <span className="prefs__inline-label">{labels.demo}</span>
+          <DemoChip trigger="break" label={labels.demoBreak} />
+          <DemoChip trigger="hydration" label={labels.demoWater} />
+          <DemoChip trigger="happy" label={labels.demoHappy} />
+        </div>
+      </section>
 
-          <section className="settings-panel">
-            <h2>{labels.focus}</h2>
-            <NumberField
-              label={labels.focusDuration}
+      <section className="prefs__group">
+        <h2 className="prefs__group-title">{labels.focus}</h2>
+        <Row
+          label={labels.focusDuration}
+          control={
+            <NumberControl
               value={draft.focusDurationMinutes}
               min={1}
               max={120}
+              unit={minuteUnit}
               onChange={(focusDurationMinutes) => updateDraft({ focusDurationMinutes })}
             />
-            <ToggleField
-              label={labels.enableDistractionDetection}
+          }
+        />
+        <Row
+          label={labels.enableDistractionDetection}
+          hint={
+            draft.distractionDetectionEnabled
+              ? labels.detectionFocusHelp
+              : labels.detectionOffHelp
+          }
+          control={
+            <ToggleControl
               checked={draft.distractionDetectionEnabled}
               onChange={(distractionDetectionEnabled) => updateDraft({ distractionDetectionEnabled })}
+              ariaLabel={labels.enableDistractionDetection}
             />
-            <NumberField
+          }
+        />
+        {draft.distractionDetectionEnabled ? (
+          <>
+            <Row
               label={labels.detectionGrace}
-              value={draft.distractionGraceSeconds}
-              min={0}
-              max={120}
-              onChange={(distractionGraceSeconds) => updateDraft({ distractionGraceSeconds })}
+              control={
+                <NumberControl
+                  value={draft.distractionGraceSeconds}
+                  min={0}
+                  max={120}
+                  unit={secondUnit}
+                  onChange={(distractionGraceSeconds) => updateDraft({ distractionGraceSeconds })}
+                />
+              }
             />
-            <ListField
+            <Row
               label={labels.blockedApps}
-              value={draft.distractionBlockedApps}
-              onChange={(distractionBlockedApps) => updateDraft({ distractionBlockedApps })}
+              control={
+                <ChipsControl
+                  value={draft.distractionBlockedApps}
+                  placeholder={language === "zh-CN" ? "添加…" : "Add…"}
+                  onChange={(distractionBlockedApps) => updateDraft({ distractionBlockedApps })}
+                />
+              }
             />
-            <ListField
+            <Row
               label={labels.blockedKeywords}
-              value={draft.distractionBlockedKeywords}
-              onChange={(distractionBlockedKeywords) => updateDraft({ distractionBlockedKeywords })}
+              control={
+                <ChipsControl
+                  value={draft.distractionBlockedKeywords}
+                  placeholder={language === "zh-CN" ? "添加…" : "Add…"}
+                  onChange={(distractionBlockedKeywords) => updateDraft({ distractionBlockedKeywords })}
+                />
+              }
             />
-            <ToggleField
-              label={labels.enableSoundEffects}
-              checked={draft.soundEnabled}
-              onChange={(soundEnabled) => updateDraft({ soundEnabled })}
-            />
-          </section>
-        </div>
-
-        <aside className="settings-side">
-          <section className="settings-panel">
-            <h2>{labels.quickActions}</h2>
-            <div className="demo-grid">
-              <DemoButton trigger="break">{labels.demoBreak}</DemoButton>
-              <DemoButton trigger="hydration">{labels.demoWater}</DemoButton>
-              <DemoButton trigger="focusWarning">{labels.demoFocusWarning}</DemoButton>
-              <DemoButton trigger="happy">{labels.demoHappy}</DemoButton>
-            </div>
-          </section>
-
-          <section className="settings-panel">
-            <button
-              className="disclosure-button"
-              type="button"
-              onClick={() => setDiagnosticsOpen((current) => !current)}
-            >
-              <span>{labels.diagnostics}</span>
-              <span>{diagnosticsOpen ? "-" : "+"}</span>
+          </>
+        ) : null}
+        <div className="prefs__inline-actions">
+          {snapshot.focusActive ? (
+            <button type="button" className="pref-button" onClick={window.pawse.stopFocus}>
+              {labels.stopFocus}
             </button>
-            {diagnosticsOpen ? (
-              <div className="diagnostics-panel">
-                <h2>{labels.runtime}</h2>
-                <dl className="runtime-grid">
-                  <div>
-                    <dt>{labels.state}</dt>
-                    <dd>{snapshot.petState}</dd>
-                  </div>
-                  <div>
-                    <dt>{labels.mode}</dt>
-                    <dd>{snapshot.focusActive ? labels.focus : snapshot.petParked ? labels.parked : labels.walking}</dd>
-                  </div>
-                  <div>
-                    <dt>{labels.reminder}</dt>
-                    <dd>{snapshot.blockingMode ?? labels.none}</dd>
-                  </div>
-                  <div>
-                    <dt>{labels.dog}</dt>
-                    <dd>{snapshot.dogVisible ? labels.visible : labels.hidden}</dd>
-                  </div>
-                </dl>
+          ) : (
+            <button type="button" className="pref-button is-primary" onClick={window.pawse.startFocus}>
+              {labels.startFocus}
+            </button>
+          )}
+          {snapshot.petParked ? (
+            <button type="button" className="pref-button" onClick={window.pawse.resumeWalking}>
+              {labels.resumeWalk}
+            </button>
+          ) : null}
+          <span className="prefs__inline-spacer" />
+          <DemoChip trigger="focusWarning" label={labels.demoFocusWarning} />
+        </div>
+      </section>
 
-                <h2>{labels.distraction}</h2>
-                <dl className="runtime-grid">
-                  <div>
-                    <dt>{labels.status}</dt>
-                    <dd>{formatDistractionState(snapshot.distraction.state, labels)}</dd>
-                  </div>
-                  <div>
-                    <dt>{labels.matched}</dt>
-                    <dd>{snapshot.distraction.matchedRule ?? labels.none}</dd>
-                  </div>
-                  <div>
-                    <dt>{labels.app}</dt>
-                    <dd>{snapshot.distraction.activeApp || labels.none}</dd>
-                  </div>
-                  <div>
-                    <dt>{labels.checked}</dt>
-                    <dd>{formatTimestamp(snapshot.distraction.lastCheckedAt, language, labels)}</dd>
-                  </div>
-                </dl>
-                <p className="diagnostic-copy">
-                  {snapshot.distraction.activeWindowTitle || labels.noActiveWindowTitle}
-                </p>
-                <p className="diagnostic-copy warning-copy">{distractionHelp(snapshot, labels)}</p>
-
-                <h2>{labels.timers}</h2>
-                <dl className="runtime-grid">
-                  <div>
-                    <dt>{labels.break}</dt>
-                    <dd>{formatTimer(snapshot.timers.breakDueAt, now, language, labels)}</dd>
-                  </div>
-                  <div>
-                    <dt>{labels.water}</dt>
-                    <dd>{formatTimer(snapshot.timers.hydrationDueAt, now, language, labels)}</dd>
-                  </div>
-                  <div>
-                    <dt>{labels.focusEnd}</dt>
-                    <dd>{formatTimer(snapshot.timers.focusEndsAt, now, language, labels)}</dd>
-                  </div>
-                  <div>
-                    <dt>{labels.updated}</dt>
-                    <dd>
-                      {new Intl.DateTimeFormat(localeFor(language), {
-                        hour: "2-digit",
-                        minute: "2-digit"
-                      }).format(now)}
-                    </dd>
-                  </div>
-                </dl>
+      <section className="prefs__group prefs__group--quiet">
+        <button
+          type="button"
+          className="prefs__disclosure"
+          onClick={() => setDiagnosticsOpen((open) => !open)}
+          aria-expanded={diagnosticsOpen}
+        >
+          <span>{labels.diagnostics}</span>
+          <span className="prefs__disclosure-caret">{diagnosticsOpen ? "▾" : "▸"}</span>
+        </button>
+        {diagnosticsOpen ? (
+          <div className="prefs__diag">
+            <dl>
+              <div>
+                <dt>{labels.state}</dt>
+                <dd>{snapshot.petState}</dd>
               </div>
+              <div>
+                <dt>{labels.mode}</dt>
+                <dd>
+                  {snapshot.focusActive ? labels.focus : snapshot.petParked ? labels.parked : labels.walking}
+                </dd>
+              </div>
+              <div>
+                <dt>{labels.reminder}</dt>
+                <dd>{snapshot.blockingMode ?? labels.none}</dd>
+              </div>
+              <div>
+                <dt>{labels.dog}</dt>
+                <dd>{snapshot.dogVisible ? labels.visible : labels.hidden}</dd>
+              </div>
+              <div>
+                <dt>{labels.distraction}</dt>
+                <dd>{formatDistractionState(snapshot.distraction.state, labels)}</dd>
+              </div>
+              <div>
+                <dt>{labels.matched}</dt>
+                <dd>{snapshot.distraction.matchedRule ?? labels.none}</dd>
+              </div>
+              <div>
+                <dt>{labels.app}</dt>
+                <dd>{snapshot.distraction.activeApp || labels.none}</dd>
+              </div>
+              <div>
+                <dt>{labels.checked}</dt>
+                <dd>{formatTimestamp(snapshot.distraction.lastCheckedAt, language, labels)}</dd>
+              </div>
+              <div>
+                <dt>{labels.break}</dt>
+                <dd>{formatTimer(snapshot.timers.breakDueAt, now, language, labels)}</dd>
+              </div>
+              <div>
+                <dt>{labels.water}</dt>
+                <dd>{formatTimer(snapshot.timers.hydrationDueAt, now, language, labels)}</dd>
+              </div>
+              <div>
+                <dt>{labels.focusEnd}</dt>
+                <dd>{formatTimer(snapshot.timers.focusEndsAt, now, language, labels)}</dd>
+              </div>
+              <div>
+                <dt>{labels.updated}</dt>
+                <dd>
+                  {new Intl.DateTimeFormat(localeFor(language), {
+                    hour: "2-digit",
+                    minute: "2-digit"
+                  }).format(now)}
+                </dd>
+              </div>
+            </dl>
+            {snapshot.distraction.activeWindowTitle ? (
+              <p className="prefs__diag-note">{snapshot.distraction.activeWindowTitle}</p>
             ) : null}
-          </section>
-        </aside>
-      </div>
-
-      <footer className="settings-command-bar">
-        <button className="secondary-action" type="button" onClick={window.pawse.resetToday}>
-          {labels.resetToday}
-        </button>
-        <button className="secondary-action" type="button" onClick={window.pawse.startFocus}>
-          {labels.startFocus}
-        </button>
-        <button className="secondary-action" type="button" onClick={window.pawse.stopFocus}>
-          {labels.stopFocus}
-        </button>
-        <button className="secondary-action" type="button" onClick={window.pawse.resumeWalking}>
-          {labels.resumeWalk}
-        </button>
-      </footer>
+            <p className="prefs__diag-hint">{distractionHelp(snapshot, labels)}</p>
+          </div>
+        ) : null}
+      </section>
     </main>
+  );
+}
+
+function DemoChip({ trigger, label }: { trigger: DemoTrigger; label: string }): JSX.Element {
+  return (
+    <button
+      type="button"
+      className="pref-chip-button"
+      onClick={() => window.pawse.triggerDemo(trigger)}
+    >
+      {label}
+    </button>
   );
 }
