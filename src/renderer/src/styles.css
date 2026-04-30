@@ -601,59 +601,79 @@ textarea {
 }
 
 .prefs__diag {
-  font-size: 12.5px;
-  margin-top: 8px;
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
 }
 
-.prefs__diag dl {
-  margin: 0;
+.diag-group__title {
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  margin: 0 0 8px;
 }
 
-.prefs__diag dl > div {
-  align-items: baseline;
-  border-top: 1px solid var(--rule);
+.diag-group__grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.diag-card {
+  background: rgba(60, 47, 28, 0.04);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
   display: flex;
-  gap: 16px;
-  justify-content: space-between;
-  padding: 6px 0;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 56px;
+  padding: 10px 12px;
 }
 
-.prefs__diag dl > div:first-child {
-  border-top: 0;
-}
-
-.prefs__diag dt {
+.diag-card__label {
   color: var(--ink-faint);
-  flex: 0 0 auto;
-  margin: 0;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
 }
 
-.prefs__diag dd {
+.diag-card__value {
   color: var(--ink);
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
-  margin: 0;
+  font-weight: 600;
   overflow-wrap: anywhere;
-  text-align: right;
 }
 
 .prefs__diag-note,
 .prefs__diag-hint {
   color: var(--ink-soft);
-  font-size: 12px;
+  font-size: 12.5px;
   line-height: 1.5;
-  margin: 10px 0 0;
+  margin: 0;
 }
 
 .prefs__diag-note {
-  border-top: 1px solid var(--rule);
+  background: rgba(60, 47, 28, 0.04);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
   color: var(--ink);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   overflow-wrap: anywhere;
-  padding-top: 10px;
+  padding: 10px 12px;
 }
 
 .prefs__diag-hint {
-  font-style: italic;
+  background: rgba(168, 90, 53, 0.08);
+  border-radius: 8px;
+  color: var(--warn);
+  padding: 10px 12px;
+}
+
+@media (max-width: 480px) {
+  .diag-group__grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .settings-shell {

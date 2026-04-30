@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { JSX } from "react";
+import type { JSX, ReactNode } from "react";
 import { i18n, LANGUAGE_OPTIONS, resolveLanguage } from "../../../shared/i18n";
 import { petAppearanceOptions, resolvePetAppearanceId } from "../../../shared/petAppearances";
 import type { DemoTrigger, Language, Settings } from "../../../shared/types";
@@ -469,67 +469,70 @@ export function SettingsView(): JSX.Element {
         </button>
         {diagnosticsOpen ? (
           <div className="prefs__diag">
-            <dl>
-              <div>
-                <dt>{labels.state}</dt>
-                <dd>{snapshot.petState}</dd>
-              </div>
-              <div>
-                <dt>{labels.mode}</dt>
-                <dd>
-                  {snapshot.focusActive ? labels.focus : snapshot.petParked ? labels.parked : labels.walking}
-                </dd>
-              </div>
-              <div>
-                <dt>{labels.reminder}</dt>
-                <dd>{snapshot.blockingMode ?? labels.none}</dd>
-              </div>
-              <div>
-                <dt>{labels.dog}</dt>
-                <dd>{snapshot.dogVisible ? labels.visible : labels.hidden}</dd>
-              </div>
-              <div>
-                <dt>{labels.distraction}</dt>
-                <dd>{formatDistractionState(snapshot.distraction.state, labels)}</dd>
-              </div>
-              <div>
-                <dt>{labels.matched}</dt>
-                <dd>{snapshot.distraction.matchedRule ?? labels.none}</dd>
-              </div>
-              <div>
-                <dt>{labels.app}</dt>
-                <dd>{snapshot.distraction.activeApp || labels.none}</dd>
-              </div>
-              <div>
-                <dt>{labels.checked}</dt>
-                <dd>{formatTimestamp(snapshot.distraction.lastCheckedAt, language, labels)}</dd>
-              </div>
-              <div>
-                <dt>{labels.break}</dt>
-                <dd>{formatTimer(snapshot.timers.breakDueAt, now, language, labels)}</dd>
-              </div>
-              <div>
-                <dt>{labels.water}</dt>
-                <dd>{formatTimer(snapshot.timers.hydrationDueAt, now, language, labels)}</dd>
-              </div>
-              <div>
-                <dt>{labels.focusEnd}</dt>
-                <dd>{formatTimer(snapshot.timers.focusEndsAt, now, language, labels)}</dd>
-              </div>
-              <div>
-                <dt>{labels.updated}</dt>
-                <dd>
-                  {new Intl.DateTimeFormat(localeFor(language), {
-                    hour: "2-digit",
-                    minute: "2-digit"
-                  }).format(now)}
-                </dd>
-              </div>
-            </dl>
+            <DiagGroup title={labels.runtime}>
+              <DiagCard label={labels.state} value={snapshot.petState} />
+              <DiagCard
+                label={labels.mode}
+                value={
+                  snapshot.focusActive
+                    ? labels.focus
+                    : snapshot.petParked
+                      ? labels.parked
+                      : labels.walking
+                }
+              />
+              <DiagCard label={labels.reminder} value={snapshot.blockingMode ?? labels.none} />
+              <DiagCard
+                label={labels.dog}
+                value={snapshot.dogVisible ? labels.visible : labels.hidden}
+              />
+            </DiagGroup>
+
+            <DiagGroup title={labels.distraction}>
+              <DiagCard
+                label={labels.status}
+                value={formatDistractionState(snapshot.distraction.state, labels)}
+              />
+              <DiagCard
+                label={labels.matched}
+                value={snapshot.distraction.matchedRule ?? labels.none}
+              />
+              <DiagCard
+                label={labels.app}
+                value={snapshot.distraction.activeApp || labels.none}
+              />
+              <DiagCard
+                label={labels.checked}
+                value={formatTimestamp(snapshot.distraction.lastCheckedAt, language, labels)}
+              />
+            </DiagGroup>
+
             {snapshot.distraction.activeWindowTitle ? (
               <p className="prefs__diag-note">{snapshot.distraction.activeWindowTitle}</p>
             ) : null}
             <p className="prefs__diag-hint">{distractionHelp(snapshot, labels)}</p>
+
+            <DiagGroup title={labels.timers}>
+              <DiagCard
+                label={labels.break}
+                value={formatTimer(snapshot.timers.breakDueAt, now, language, labels)}
+              />
+              <DiagCard
+                label={labels.water}
+                value={formatTimer(snapshot.timers.hydrationDueAt, now, language, labels)}
+              />
+              <DiagCard
+                label={labels.focusEnd}
+                value={formatTimer(snapshot.timers.focusEndsAt, now, language, labels)}
+              />
+              <DiagCard
+                label={labels.updated}
+                value={new Intl.DateTimeFormat(localeFor(language), {
+                  hour: "2-digit",
+                  minute: "2-digit"
+                }).format(now)}
+              />
+            </DiagGroup>
           </div>
         ) : null}
       </section>
@@ -546,5 +549,29 @@ function DemoChip({ trigger, label }: { trigger: DemoTrigger; label: string }): 
     >
       {label}
     </button>
+  );
+}
+
+function DiagGroup({
+  title,
+  children
+}: {
+  title: string;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <section className="diag-group">
+      <h3 className="diag-group__title">{title}</h3>
+      <div className="diag-group__grid">{children}</div>
+    </section>
+  );
+}
+
+function DiagCard({ label, value }: { label: string; value: string }): JSX.Element {
+  return (
+    <div className="diag-card">
+      <span className="diag-card__label">{label}</span>
+      <span className="diag-card__value">{value}</span>
+    </div>
   );
 }
