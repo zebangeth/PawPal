@@ -328,6 +328,9 @@ function createSettingsWindow(): void {
     title: `${APP_NAME} ${text().menu.settings}`,
     resizable: false,
     show: false,
+    backgroundColor: "#faf6ee",
+    titleBarStyle: "hiddenInset",
+    trafficLightPosition: { x: 14, y: 14 },
     webPreferences: {
       preload: PRELOAD_PATH,
       contextIsolation: true,

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { JSX, ReactNode } from "react";
 import { i18n, LANGUAGE_OPTIONS, resolveLanguage } from "../../../shared/i18n";
 import { petAppearanceOptions, resolvePetAppearanceId } from "../../../shared/petAppearances";
-import type { DemoTrigger, Language, Settings } from "../../../shared/types";
+import type { DemoTrigger, Language, PetAppearanceId, Settings } from "../../../shared/types";
 import { getPetAsset } from "../assets";
 import { distractionHelp, formatDistractionState, formatTimer, formatTimestamp, localeFor } from "../format";
 import { useNow, useSnapshot } from "../hooks";
@@ -296,16 +296,22 @@ export function SettingsView(): JSX.Element {
             />
           }
         />
-        <Row
-          label={labels.petAppearance}
-          control={
-            <SelectControl
-              value={resolvePetAppearanceId(draft.petAppearanceId)}
-              options={petAppearanceOptions(language)}
-              onChange={(value) => updateDraft({ petAppearanceId: resolvePetAppearanceId(value) })}
-            />
-          }
-        />
+        <div className="pref-block">
+          <span className="pref-block__label">{labels.petAppearance}</span>
+          <div className="pet-picker">
+            {petAppearanceOptions(language).map((option) => (
+              <PetCard
+                key={option.value}
+                appearanceId={option.value}
+                label={option.label}
+                selected={resolvePetAppearanceId(draft.petAppearanceId) === option.value}
+                onSelect={() =>
+                  updateDraft({ petAppearanceId: resolvePetAppearanceId(option.value) })
+                }
+              />
+            ))}
+          </div>
+        </div>
         <Row
           label={labels.enableSoundEffects}
           control={
@@ -364,12 +370,6 @@ export function SettingsView(): JSX.Element {
             />
           }
         />
-        <div className="prefs__inline-actions">
-          <span className="prefs__inline-label">{labels.demo}</span>
-          <DemoChip trigger="break" label={labels.demoBreak} />
-          <DemoChip trigger="hydration" label={labels.demoWater} />
-          <DemoChip trigger="happy" label={labels.demoHappy} />
-        </div>
       </section>
 
       <section className="prefs__group">
@@ -452,8 +452,6 @@ export function SettingsView(): JSX.Element {
               {labels.resumeWalk}
             </button>
           ) : null}
-          <span className="prefs__inline-spacer" />
-          <DemoChip trigger="focusWarning" label={labels.demoFocusWarning} />
         </div>
       </section>
 
@@ -469,6 +467,16 @@ export function SettingsView(): JSX.Element {
         </button>
         {diagnosticsOpen ? (
           <div className="prefs__diag">
+            <section className="diag-group">
+              <h3 className="diag-group__title">{labels.demo}</h3>
+              <div className="diag-demo">
+                <DemoChip trigger="break" label={labels.demoBreak} />
+                <DemoChip trigger="hydration" label={labels.demoWater} />
+                <DemoChip trigger="focusWarning" label={labels.demoFocusWarning} />
+                <DemoChip trigger="happy" label={labels.demoHappy} />
+              </div>
+            </section>
+
             <DiagGroup title={labels.runtime}>
               <DiagCard label={labels.state} value={snapshot.petState} />
               <DiagCard
@@ -537,6 +545,34 @@ export function SettingsView(): JSX.Element {
         ) : null}
       </section>
     </main>
+  );
+}
+
+function PetCard({
+  appearanceId,
+  label,
+  selected,
+  onSelect
+}: {
+  appearanceId: PetAppearanceId;
+  label: string;
+  selected: boolean;
+  onSelect: () => void;
+}): JSX.Element {
+  const asset = useMemo(() => getPetAsset(appearanceId, "walking"), [appearanceId]);
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      className={`pet-card${selected ? " is-selected" : ""}`}
+      onClick={onSelect}
+    >
+      <span className="pet-card__preview">
+        <img src={asset.src} alt="" />
+      </span>
+      <span className="pet-card__name">{label}</span>
+    </button>
   );
 }
 
