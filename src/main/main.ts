@@ -488,17 +488,6 @@ function showPetContextMenu(): void {
   Menu.buildFromTemplate(template).popup({ window: petWindow ?? undefined });
 }
 
-function pinToBottomRight(): void {
-  if (!petWindow || petWindow.isDestroyed()) return;
-  const workArea = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
-  petWindow.setBounds({
-    x: workArea.x + workArea.width - PET_WINDOW.width - 24,
-    y: workArea.y + workArea.height - PET_WINDOW.height,
-    width: PET_WINDOW.width,
-    height: PET_WINDOW.height
-  });
-}
-
 function movePetWithCursor(): void {
   if (!petWindow || petWindow.isDestroyed()) return;
   const cursor = screen.getCursorScreenPoint();
@@ -740,7 +729,6 @@ function resumeLongTermState(): void {
   hideBubble();
   if (focusActive) {
     setPetState("focusGuard");
-    pinToBottomRight();
     sendToAll("app:snapshot", snapshot());
     return;
   }
@@ -756,7 +744,6 @@ function happyFeedback(message: string = text().bubble.woof, after?: () => void)
   setTimeout(() => {
     hideBubble();
     setPetState(returnState);
-    if (focusActive) pinToBottomRight();
     after?.();
   }, 1900);
 }
@@ -813,7 +800,6 @@ function triggerFocusWarning(): void {
   updateStats((stats) => ({ ...stats, focusWarnings: stats.focusWarnings + 1 }));
   sendToAll("app:snapshot", snapshot());
   setPetState("focusGuard");
-  pinToBottomRight();
   const labels = text();
   showBubble({
     id: "focus-warning",
@@ -835,7 +821,6 @@ function startFocusMode(): void {
   setPetState("focusGuard");
   focusEndsAt = Date.now() + settings.focusDurationMinutes * 60 * 1000;
   sendToAll("app:snapshot", snapshot());
-  pinToBottomRight();
   showBubble({
     id: "focus-start",
     message: text().bubble.focusStart(settings.focusDurationMinutes),
