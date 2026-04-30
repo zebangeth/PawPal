@@ -32,10 +32,10 @@ textarea {
   flex-direction: column;
   height: 290px;
   justify-content: flex-end;
-  padding: 0 8px;
+  padding: 0 4px;
   pointer-events: none;
   position: relative;
-  width: 300px;
+  width: 260px;
 }
 
 .pet-button {
@@ -107,7 +107,7 @@ textarea {
   bottom: 154px;
   left: 50%;
   min-width: 210px;
-  max-width: calc(100% - 18px);
+  max-width: calc(100% - 12px);
   padding: 12px;
   position: absolute;
   pointer-events: auto;
@@ -161,18 +161,31 @@ textarea {
 }
 
 .focus-badge {
-  background: #244e45;
+  align-items: baseline;
+  background: rgba(255, 252, 244, 0.86);
+  border: 1px solid rgba(36, 78, 69, 0.14);
   border-radius: 999px;
-  bottom: 18px;
-  color: #fffaf0;
-  font-size: 12px;
-  font-weight: 700;
+  bottom: 8px;
+  box-shadow: 0 6px 16px rgba(45, 38, 31, 0.12);
+  color: #244e45;
+  display: flex;
+  gap: 6px;
+  left: 50%;
+  font-size: 11px;
+  font-weight: 650;
   letter-spacing: 0;
-  padding: 6px 10px;
+  padding: 4px 8px;
   pointer-events: auto;
   position: absolute;
-  right: 36px;
+  transform: translateX(-50%);
+  white-space: nowrap;
   z-index: 1;
+}
+
+.focus-badge strong {
+  color: #2d261f;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .prefs {

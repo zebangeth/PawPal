@@ -3,7 +3,7 @@ import type { JSX, PointerEvent } from "react";
 import { i18n, resolveLanguage } from "../../../shared/i18n";
 import type { SpeechBubble } from "../../../shared/types";
 import { getPetAsset } from "../assets";
-import { useSnapshot } from "../hooks";
+import { useNow, useSnapshot } from "../hooks";
 
 type DragRef = {
   pointerId: number;
@@ -12,8 +12,17 @@ type DragRef = {
   dragging: boolean;
 };
 
+function formatFocusCountdown(endsAt: number | null, now: number): string {
+  const remainingSeconds = Math.max(0, Math.ceil(((endsAt ?? now) - now) / 1000));
+  const hours = Math.floor(remainingSeconds / 3600);
+  const minutes = Math.floor((remainingSeconds % 3600) / 60);
+  const seconds = remainingSeconds % 60;
+  return [hours, minutes, seconds].map((part) => String(part).padStart(2, "0")).join(":");
+}
+
 export function PetView(): JSX.Element {
   const snapshot = useSnapshot();
+  const now = useNow(1000);
   const [bubble, setBubble] = useState<SpeechBubble | null>(null);
   const dragRef = useRef<DragRef | null>(null);
   const labels = i18n(resolveLanguage(snapshot.settings.language)).settings;
@@ -104,7 +113,10 @@ export function PetView(): JSX.Element {
       ) : null}
 
       {snapshot.focusActive && state === "focusGuard" ? (
-        <div className="focus-badge">{labels.focus}</div>
+        <div className="focus-badge">
+          <span>{labels.focus}</span>
+          <strong>{formatFocusCountdown(snapshot.timers.focusEndsAt, now)}</strong>
+        </div>
       ) : null}
 
       <button
