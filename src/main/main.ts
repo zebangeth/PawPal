@@ -512,7 +512,7 @@ function movePetWithCursor(): void {
 }
 
 function startPetDrag(offset: { offsetX: number; offsetY: number }): void {
-  if (blockingMode || !petWindow || petWindow.isDestroyed()) return;
+  if (blockingMode === "breakRun" || !petWindow || petWindow.isDestroyed()) return;
   dragOffset = {
     x: Math.min(Math.max(Math.round(offset.offsetX), 0), PET_WINDOW.width),
     y: Math.min(Math.max(Math.round(offset.offsetY), 0), PET_WINDOW.height)
