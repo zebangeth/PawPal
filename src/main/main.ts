@@ -386,7 +386,6 @@ function createSettingsWindow(): void {
 
 function createTray(): void {
   tray = new Tray(createTrayImage());
-  tray.setTitle(APP_NAME);
   tray.setToolTip(APP_NAME);
   tray.on("click", () => {
     tray?.popUpContextMenu();

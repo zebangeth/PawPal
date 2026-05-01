@@ -2,7 +2,7 @@ import type { Settings, TodayStats } from "./types";
 
 export const DEFAULT_SETTINGS: Settings = {
   language: "zh-CN",
-  petAppearanceId: "lovartPuppy",
+  petAppearanceId: "lineDog",
   onboardingDismissed: false,
   breakReminderEnabled: true,
   breakIntervalMinutes: 45,

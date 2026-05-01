@@ -27,8 +27,8 @@ export const PET_APPEARANCES: Record<PetAppearanceId, PetAppearanceManifest> = {
   lovartPuppy: {
     id: "lovartPuppy",
     label: {
-      "zh-CN": "金毛 puppy",
-      en: "Golden Puppy"
+      "zh-CN": "金毛 puppy (beta)",
+      en: "Golden Puppy (beta)"
     },
     fallback: {
       path: goldenPuppy("idle", "standing pose.gif"),
