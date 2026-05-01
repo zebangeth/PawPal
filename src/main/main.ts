@@ -736,11 +736,13 @@ function resumeLongTermState(): void {
   sendToAll("app:snapshot", snapshot());
 }
 
-function happyFeedback(message: string = text().bubble.woof, after?: () => void): void {
+function happyFeedback(message: string | null = text().bubble.woof, after?: () => void): void {
   if (blockingMode) return;
   const returnState = focusActive ? "focusGuard" : "idle";
   setPetState("happy");
-  showBubble({ id: "happy", message, autoDismissMs: 1800 });
+  if (message) {
+    showBubble({ id: "happy", message, autoDismissMs: 1800 });
+  }
   setTimeout(() => {
     hideBubble();
     setPetState(returnState);
@@ -949,7 +951,7 @@ function registerIpc(): void {
   ipcMain.handle("app:get-snapshot", () => snapshot());
   ipcMain.on("pet:clicked", () => {
     if (blockingMode) return;
-    happyFeedback(text().bubble.woof);
+    happyFeedback(null);
   });
   ipcMain.on("pet:context-menu", showPetContextMenu);
   ipcMain.on("pet:drag-start", (_event, offset: { offsetX: number; offsetY: number }) =>
