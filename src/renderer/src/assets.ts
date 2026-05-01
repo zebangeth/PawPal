@@ -9,6 +9,7 @@ const warnedPlaceholders = new Set<string>();
 export type PetAsset = {
   src: string;
   isPlaceholder: boolean;
+  replayIntervalMs?: number;
 };
 
 function normalizeAssetPaths(path: string | string[]): string[] {
@@ -24,7 +25,8 @@ export function getPetAssetVariantCount(appearanceId: PetAppearanceId, state: Pe
 export function getPetAsset(
   appearanceId: PetAppearanceId,
   state: PetState,
-  variantIndex = 0
+  variantIndex = 0,
+  replayKey = 0
 ): PetAsset {
   const resolvedAppearanceId = resolvePetAppearanceId(appearanceId);
   const asset = getPetAssetDefinition(resolvedAppearanceId, state);
@@ -37,8 +39,14 @@ export function getPetAsset(
     console.warn(`Pawse is using a placeholder asset for ${warningKey}.`);
   }
 
+  const src = new URL(window.pawse.assetUrl(selectedPath));
+  if (replayKey > 0) {
+    src.searchParams.set("pawseReplay", String(replayKey));
+  }
+
   return {
-    src: window.pawse.assetUrl(selectedPath),
-    isPlaceholder: Boolean(asset.isPlaceholder)
+    src: src.href,
+    isPlaceholder: Boolean(asset.isPlaceholder),
+    replayIntervalMs: asset.replayIntervalMs
   };
 }

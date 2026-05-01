@@ -124,6 +124,19 @@ manifest 的 `path` 可以是一个字符串，也可以是字符串数组。
 
 如果状态只有一个素材，就不会发生轮换。
 
+## 有限循环或异常 GIF
+
+有些 GIF 文件虽然能播放，但内部 frame delay 或 loop metadata 不适合桌宠长期展示。例如某个 GIF 跑几秒后停在一帧上。遇到这种素材时，优先重新导出 GIF；如果暂时不能重做素材，可以在 manifest 里加 `replayIntervalMs`：
+
+```ts
+breakRunning: {
+  path: "pet_assets/example/breakRunning/run.gif",
+  replayIntervalMs: 1700
+}
+```
+
+renderer 会按这个间隔重新挂载图片，让 GIF 在进入停顿帧前重新开始播放。这个字段只应该用于修复有问题的 GIF，不要给正常无限循环素材滥用。
+
 ## 状态级 Fallback
 
 部分完成态可以选择不提供专门素材。当前 resolver 会按下面顺序找素材：

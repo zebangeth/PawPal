@@ -37,6 +37,7 @@ export function PetView(): JSX.Element {
   const now = useNow(1000);
   const [bubble, setBubble] = useState<SpeechBubble | null>(null);
   const [assetVariant, setAssetVariant] = useState(0);
+  const [assetReplayKey, setAssetReplayKey] = useState(0);
   const [stateSignal, setStateSignal] = useState(0);
   const dragRef = useRef<DragRef | null>(null);
   const labels = i18n(resolveLanguage(snapshot.settings.language)).settings;
@@ -56,17 +57,26 @@ export function PetView(): JSX.Element {
   const altText = `Pawse ${state}`;
   const facingClass = snapshot.petFacing === "left" ? "facing-left" : "facing-right";
   const appearanceId = snapshot.settings.petAppearanceId;
-  const asset = getPetAsset(appearanceId, state, assetVariant);
+  const asset = getPetAsset(appearanceId, state, assetVariant, assetReplayKey);
 
   useEffect(() => {
     const variantCount = getPetAssetVariantCount(appearanceId, state);
     setAssetVariant(randomVariant(variantCount));
+    setAssetReplayKey(0);
     if (!CONTINUOUS_ASSET_STATES.has(state) || variantCount <= 1) return;
     const timer = window.setInterval(() => {
       setAssetVariant((current) => randomVariant(variantCount, current));
     }, CONTINUOUS_ASSET_ROTATION_MS);
     return () => window.clearInterval(timer);
   }, [appearanceId, state, stateSignal]);
+
+  useEffect(() => {
+    if (!asset.replayIntervalMs) return;
+    const timer = window.setInterval(() => {
+      setAssetReplayKey((current) => current + 1);
+    }, asset.replayIntervalMs);
+    return () => window.clearInterval(timer);
+  }, [asset.replayIntervalMs]);
 
   function startPointer(event: PointerEvent<HTMLButtonElement>): void {
     if (event.button !== 0) return;

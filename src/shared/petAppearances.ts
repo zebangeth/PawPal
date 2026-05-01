@@ -3,6 +3,7 @@ import type { Language, PetAppearanceId, PetState } from "./types";
 export type PetAssetDefinition = {
   path: string | string[];
   isPlaceholder?: boolean;
+  replayIntervalMs?: number;
 };
 
 export type PetAppearanceManifest = {
@@ -36,7 +37,10 @@ export const PET_APPEARANCES: Record<PetAppearanceId, PetAppearanceManifest> = {
       sitting: { path: "lovart_footage/puppy/3 - welcome to work.gif" },
       happy: { path: "lovart_footage/puppy/1 - waiting for playing outside.gif" },
       breakPrompt: { path: "lovart_footage/puppy/1 - waiting for playing outside.gif" },
-      breakRunning: { path: "lovart_footage/puppy/1 - playing outside.gif" },
+      breakRunning: {
+        path: "lovart_footage/puppy/1 - playing outside.gif",
+        replayIntervalMs: 4500
+      },
       hydrationPrompt: { path: "lovart_footage/water_gifs/want_water.gif" },
       drinking: { path: "lovart_footage/water_gifs/got_water.gif" },
       focusGuard: { path: "lovart_footage/puppy/standing pose4.gif" },
