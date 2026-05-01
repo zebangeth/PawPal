@@ -557,7 +557,7 @@ function showBreakRunCountdown(endsAt: number): void {
 }
 
 function chooseBreakRunVelocity(): PetPosition {
-  const speed = 11 + Math.random() * 9;
+  const speed = 3.5 + Math.random() * 2.9;
   const angle = Math.random() * Math.PI * 2;
   return {
     x: Math.cos(angle) * speed,

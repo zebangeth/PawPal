@@ -24,4 +24,4 @@ export const IS_DEV = Boolean(process.env.ELECTRON_RENDERER_URL);
 export const DISTRACTION_CHECK_INTERVAL_MS = 3000;
 export const DISTRACTION_WARNING_COOLDOWN_MS = 60_000;
 export const BREAK_RUN_DURATION_MS = 60_000;
-export const BREAK_RUN_TICK_MS = 50;
+export const BREAK_RUN_TICK_MS = 16;
