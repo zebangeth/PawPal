@@ -59,10 +59,9 @@ export const I18N = {
         (minutes: number) => `专心${minutes} 分钟，我盯着`
       ],
       focusWarning: [
-        "嘿，说好专注的",
-        "走神啦！快回来~",
-        "汪！我看到你在摸鱼了",
-        "不许开小差！"
+        (rule: string) => `说好专注的，不许看 ${rule}`,
+        (rule: string) => `走神啦！${rule} 不能玩`,
+        (rule: string) => `你怎么在偷偷看 ${rule} 了`,
       ],
       focusComplete: [
         "专心时间到！",
@@ -230,10 +229,9 @@ export const I18N = {
         (minutes: number) => `Focus for ${minutes} minutes, I'm watching`
       ],
       focusWarning: [
-        "Hey, we said we'd focus!",
-        "You're distracted! Come back~",
-        "Woof! I saw you slacking off",
-        "No wandering off!"
+        (rule: string) => `Hey, no ${rule}! We said we'd focus!`,
+        (rule: string) => `I saw you open ${rule}~ come back!`,
+        (rule: string) => `Stay away from ${rule}!`
       ],
       focusComplete: [
         "Focus time's up!",

@@ -355,7 +355,10 @@ function createSettingsWindow(): void {
     width: SETTINGS_WINDOW.width,
     height: SETTINGS_WINDOW.height,
     title: `${APP_NAME} ${text().menu.settings}`,
-    resizable: false,
+    resizable: true,
+    minWidth: SETTINGS_WINDOW.width,
+    maxWidth: SETTINGS_WINDOW.width,
+    minHeight: 400,
     show: false,
     backgroundColor: "#faf6ee",
     titleBarStyle: "hiddenInset",
@@ -704,7 +707,7 @@ async function checkDistractionNow(): Promise<void> {
     }
 
     setDistractionStatus({ lastWarningAt: now });
-    triggerFocusWarning();
+    triggerFocusWarning(matchedRule);
   } catch (error) {
     setDistractionStatus({
       state: isPermissionError(error) ? "permission-needed" : "error",
@@ -818,7 +821,7 @@ function triggerHydrationReminder(fromDemo: boolean): void {
   });
 }
 
-function triggerFocusWarning(): void {
+function triggerFocusWarning(rule?: string): void {
   if (blockingMode === "breakRun") return;
   ensurePetWindowVisible();
   if (!focusActive) startFocusMode();
@@ -829,7 +832,7 @@ function triggerFocusWarning(): void {
   const labels = text();
   showBubble({
     id: "focus-warning",
-    message: pick(labels.bubble.focusWarning),
+    message: pick(labels.bubble.focusWarning)(rule ?? "?"),
     actions: [
       { id: "focus:back", label: labels.actions.focusBack, kind: "primary" },
       { id: "focus:end", label: labels.actions.focusEnd }
@@ -898,7 +901,7 @@ function triggerDemo(trigger: DemoTrigger): void {
   ensurePetWindowVisible();
   if (trigger === "break") triggerBreakReminder(true);
   if (trigger === "hydration") triggerHydrationReminder(true);
-  if (trigger === "focusWarning") triggerFocusWarning();
+  if (trigger === "focusWarning") triggerFocusWarning("Twitter");
   if (trigger === "happy") happyFeedback(pick(text().bubble.woof));
 }
 
