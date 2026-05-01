@@ -248,10 +248,10 @@ export function SettingsView(): JSX.Element {
       </header>
 
       <section className="prefs__stats" aria-label={labels.today}>
-        <StatCard label={labels.breaks} value={stats.breaksTaken} />
-        <StatCard label={labels.waters} value={stats.watersLogged} />
+        <StatCard label={labels.breaks} value={stats.breaksTaken} unit={labels.countUnit} />
+        <StatCard label={labels.waters} value={stats.watersLogged} unit={labels.countUnit} />
         <StatCard label={labels.focusMin} value={stats.focusMinutes} unit={labels.minuteUnit} />
-        <StatCard label={labels.warnings} value={stats.focusWarnings} />
+        <StatCard label={labels.warnings} value={stats.focusWarnings} unit={labels.countUnit} />
       </section>
 
       {!draft.onboardingDismissed ? (
