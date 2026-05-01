@@ -1,15 +1,50 @@
 {
   "name": "pawse",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "A tiny desktop dog that helps you pause before you burn out.",
   "license": "MIT",
-  "private": true,
   "type": "module",
   "main": "out/main/main.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "pnpm typecheck && electron-vite build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dist": "pnpm build && electron-builder --mac dmg"
+  },
+  "build": {
+    "appId": "com.pawse.app",
+    "productName": "Pawse",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": "dmg",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": {
+        "teamId": "${env.APPLE_TEAM_ID}"
+      }
+    },
+    "dmg": {
+      "title": "Pawse",
+      "contents": [
+        { "x": 130, "y": 220 },
+        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+      ]
+    },
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "pet_assets",
+        "to": "pet_assets",
+        "filter": ["**/*", "!.DS_Store"]
+      }
+    ]
   },
   "dependencies": {
     "electron-store": "^10.1.0",
@@ -22,6 +57,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
     "electron": "^39.2.5",
+    "electron-builder": "^26.8.1",
     "electron-vite": "^4.0.0",
     "typescript": "^5.9.3",
     "vite": "^7.2.4"
