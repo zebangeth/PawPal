@@ -72,9 +72,8 @@ textarea {
 
 .state-idle,
 .state-sitting,
-.state-focusGuard,
 .state-sleeping {
-  animation: pet-breathe 2.4s ease-in-out infinite;
+  animation: pet-breathe 3.2s ease-in-out infinite;
 }
 
 .state-happy,
@@ -102,7 +101,6 @@ textarea {
 }
 
 .state-focusAlert {
-  animation: pet-alert 0.72s ease-in-out infinite;
 }
 
 .speech-bubble {
@@ -920,7 +918,7 @@ textarea {
     transform: scale(1);
   }
   50% {
-    transform: scale(1.025);
+    transform: scale(1.02);
   }
 }
 

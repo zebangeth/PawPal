@@ -707,7 +707,7 @@ async function checkDistractionNow(): Promise<void> {
     }
 
     setDistractionStatus({ lastWarningAt: now });
-    triggerFocusWarning(matchedRule);
+    triggerFocusWarning(matchedRule.replace(/^(app|keyword):/, ""));
   } catch (error) {
     setDistractionStatus({
       state: isPermissionError(error) ? "permission-needed" : "error",
