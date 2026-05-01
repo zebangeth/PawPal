@@ -50,6 +50,6 @@ const api = {
     onChannel("app:snapshot", callback)
 };
 
-contextBridge.exposeInMainWorld("pawse", api);
+contextBridge.exposeInMainWorld("pawpal", api);
 
-export type PawseApi = typeof api;
+export type PawPalApi = typeof api;

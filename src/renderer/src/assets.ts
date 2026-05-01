@@ -36,12 +36,12 @@ export function getPetAsset(
 
   if (asset.isPlaceholder && !warnedPlaceholders.has(warningKey)) {
     warnedPlaceholders.add(warningKey);
-    console.warn(`Pawse is using a placeholder asset for ${warningKey}.`);
+    console.warn(`PawPal is using a placeholder asset for ${warningKey}.`);
   }
 
-  const src = new URL(window.pawse.assetUrl(selectedPath));
+  const src = new URL(window.pawpal.assetUrl(selectedPath));
   if (replayKey > 0) {
-    src.searchParams.set("pawseReplay", String(replayKey));
+    src.searchParams.set("pawpalReplay", String(replayKey));
   }
 
   return {

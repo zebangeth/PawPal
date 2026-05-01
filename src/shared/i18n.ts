@@ -102,9 +102,9 @@ export const I18N = {
     },
     settings: {
       title: "设置",
-      welcomeTitle: "欢迎使用 Pawse",
+      welcomeTitle: "欢迎使用 PawPal",
       welcomeCopy:
-        "Pawse 会住在菜单栏和屏幕底部，定时提醒你休息、喝水和保持专注。如果要启用分心检测，请在 macOS 系统设置里允许辅助功能权限。",
+        "PawPal 会住在菜单栏和屏幕底部，定时提醒你休息、喝水和保持专注。如果要启用分心检测，请在 macOS 系统设置里允许辅助功能权限。",
       dismissWelcome: "知道了",
       appearance: "外观",
       quickActions: "快捷操作",
@@ -175,7 +175,7 @@ export const I18N = {
       detectionOffHelp: "分心检测已关闭。开启后保存，即可预览当前活动窗口。",
       detectionWaitingHelp: "正在等待第一次活动窗口检查。",
       detectionPermissionHelp:
-        "需要在 macOS 系统设置里允许 Pawse/Terminal 获取辅助功能权限，然后重启应用或重新开启分心检测。",
+        "需要在 macOS 系统设置里允许 PawPal/Terminal 获取辅助功能权限，然后重启应用或重新开启分心检测。",
       detectionUnsupportedHelp: "当前系统暂不支持活动窗口检测，分心检测会保持关闭状态。",
       detectionErrorHelp: "活动窗口检测暂时失败。请检查权限后，重新开启分心检测或重启应用。",
       detectionPreviewHelp: "正在预览当前活动窗口。开始专注后，命中规则会触发分心提醒。",
@@ -273,9 +273,9 @@ export const I18N = {
     },
     settings: {
       title: "Settings",
-      welcomeTitle: "Welcome to Pawse",
+      welcomeTitle: "Welcome to PawPal",
       welcomeCopy:
-        "Pawse lives in the menu bar and near the bottom of your screen. It reminds you to take breaks, drink water, and stay focused. Enable macOS accessibility permissions before using distraction detection.",
+        "PawPal lives in the menu bar and near the bottom of your screen. It reminds you to take breaks, drink water, and stay focused. Enable macOS accessibility permissions before using distraction detection.",
       dismissWelcome: "Got it",
       appearance: "Appearance",
       quickActions: "Quick Actions",
@@ -346,7 +346,7 @@ export const I18N = {
       detectionOffHelp: "Detection is off. Enable it and Save to preview the active window.",
       detectionWaitingHelp: "Waiting for the first active-window check.",
       detectionPermissionHelp:
-        "Allow Pawse/Terminal in macOS System Settings accessibility permissions, then restart the app or toggle detection again.",
+        "Allow PawPal/Terminal in macOS System Settings accessibility permissions, then restart the app or toggle detection again.",
       detectionUnsupportedHelp:
         "Active-window detection is not supported on this system yet, so distraction detection will stay inactive.",
       detectionErrorHelp:

@@ -1,7 +1,8 @@
 {
-  "name": "pawse",
+  "name": "pawpal",
   "version": "0.1.0",
   "description": "A tiny desktop dog that helps you pause before you burn out.",
+  "author": "zebangeth",
   "license": "MIT",
   "type": "module",
   "main": "out/main/main.js",
@@ -12,8 +13,8 @@
     "dist": "pnpm build && electron-builder --mac dmg"
   },
   "build": {
-    "appId": "com.pawse.app",
-    "productName": "Pawse",
+    "appId": "com.pawpal.app",
+    "productName": "PawPal",
     "mac": {
       "category": "public.app-category.productivity",
       "target": "dmg",
@@ -21,12 +22,10 @@
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
-      "notarize": {
-        "teamId": "${env.APPLE_TEAM_ID}"
-      }
+      "notarize": true
     },
     "dmg": {
-      "title": "Pawse",
+      "title": "PawPal",
       "contents": [
         { "x": 130, "y": 220 },
         { "x": 410, "y": 220, "type": "link", "path": "/Applications" }

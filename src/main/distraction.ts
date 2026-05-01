@@ -6,7 +6,7 @@ export type ActiveWindowInfo = {
   windowTitle: string;
 };
 
-const IGNORED_DISTRACTION_APPS = ["Pawse", "Electron"];
+const IGNORED_DISTRACTION_APPS = ["PawPal", "Electron"];
 
 function normalizeRule(value: string): string {
   return value.trim().toLowerCase();

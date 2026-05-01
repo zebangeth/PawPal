@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-export const APP_NAME = "Pawse";
-export const STORE_NAME = "pawse-demo";
+export const APP_NAME = "PawPal";
+export const STORE_NAME = "pawpal";
 
 export const PET_WINDOW = {
   width: 220,

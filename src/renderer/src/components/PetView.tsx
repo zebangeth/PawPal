@@ -43,9 +43,9 @@ export function PetView(): JSX.Element {
   const labels = i18n(resolveLanguage(snapshot.settings.language)).settings;
 
   useEffect(() => {
-    const offBubble = window.pawse.onShowBubble(setBubble);
-    const offHide = window.pawse.onHideBubble(() => setBubble(null));
-    const offPetState = window.pawse.onPetState(() => setStateSignal((current) => current + 1));
+    const offBubble = window.pawpal.onShowBubble(setBubble);
+    const offHide = window.pawpal.onHideBubble(() => setBubble(null));
+    const offPetState = window.pawpal.onPetState(() => setStateSignal((current) => current + 1));
     return () => {
       offBubble();
       offHide();
@@ -54,7 +54,7 @@ export function PetView(): JSX.Element {
   }, []);
 
   const state = snapshot.petState;
-  const altText = `Pawse ${state}`;
+  const altText = `PawPal ${state}`;
   const facingClass = snapshot.petFacing === "left" ? "facing-left" : "facing-right";
   const appearanceId = snapshot.settings.petAppearanceId;
   const asset = getPetAsset(appearanceId, state, assetVariant, assetReplayKey);
@@ -95,7 +95,7 @@ export function PetView(): JSX.Element {
     const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
     if (!drag.dragging && distance > 4) {
       drag.dragging = true;
-      window.pawse.petDragStart({ offsetX: drag.startX, offsetY: drag.startY });
+      window.pawpal.petDragStart({ offsetX: drag.startX, offsetY: drag.startY });
     }
   }
 
@@ -107,26 +107,26 @@ export function PetView(): JSX.Element {
     }
     dragRef.current = null;
     if (drag.dragging) {
-      window.pawse.petDragStop();
+      window.pawpal.petDragStop();
       return;
     }
-    window.pawse.petClicked();
+    window.pawpal.petClicked();
   }
 
   function cancelPointer(event: PointerEvent<HTMLButtonElement>): void {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     dragRef.current = null;
-    if (drag.dragging) window.pawse.petDragStop();
+    if (drag.dragging) window.pawpal.petDragStop();
   }
 
   return (
     <main
       className="pet-shell"
-      aria-label="Pawse desktop pet"
+      aria-label="PawPal desktop pet"
       onContextMenu={(event) => {
         event.preventDefault();
-        window.pawse.petContextMenu();
+        window.pawpal.petContextMenu();
       }}
     >
       {bubble ? (
@@ -138,7 +138,7 @@ export function PetView(): JSX.Element {
                 <button
                   className={`bubble-button ${action.kind ?? "secondary"}`}
                   key={action.id}
-                  onClick={() => window.pawse.bubbleAction(action.id)}
+                  onClick={() => window.pawpal.bubbleAction(action.id)}
                   type="button"
                 >
                   {action.label}

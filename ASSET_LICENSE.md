@@ -1,6 +1,6 @@
 # Asset Licensing
 
-Pawse separates source code licensing from pet animation asset licensing.
+PawPal separates source code licensing from pet animation asset licensing.
 
 ## Source Code
 

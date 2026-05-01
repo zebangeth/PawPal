@@ -226,7 +226,7 @@ export function SettingsView(): JSX.Element {
   useEffect(() => {
     if (!settingsDirty) return;
     const timer = window.setTimeout(() => {
-      window.pawse.updateSettings(draft);
+      window.pawpal.updateSettings(draft);
       setSettingsDirty(false);
     }, 350);
     return () => window.clearTimeout(timer);
@@ -242,7 +242,7 @@ export function SettingsView(): JSX.Element {
       <header className="prefs__head">
         <img className="prefs__avatar" src={petAvatar.src} alt="" />
         <div className="prefs__intro">
-          <p className="prefs__eyebrow">Pawse</p>
+          <p className="prefs__eyebrow">PawPal</p>
           <h1 className="prefs__title">{labels.today}</h1>
         </div>
       </header>
@@ -414,18 +414,18 @@ export function SettingsView(): JSX.Element {
         ) : null}
         <div className="prefs__inline-actions">
           {snapshot.focusActive ? (
-            <button type="button" className="pref-button" onClick={window.pawse.stopFocus}>
+            <button type="button" className="pref-button" onClick={window.pawpal.stopFocus}>
               {labels.stopFocus}
             </button>
           ) : (
-            <button type="button" className="pref-button is-primary" onClick={window.pawse.startFocus}>
+            <button type="button" className="pref-button is-primary" onClick={window.pawpal.startFocus}>
               {labels.startFocus}
             </button>
           )}
         </div>
       </section>
 
-      {!window.pawse.isPackaged && (
+      {!window.pawpal.isPackaged && (
         <section className="prefs__group">
           <h2 className="prefs__group-title">{labels.testTools}</h2>
           <div className="test-tools">
@@ -433,7 +433,7 @@ export function SettingsView(): JSX.Element {
             <DemoChip trigger="hydration" label={labels.demoWater} />
             <DemoChip trigger="focusWarning" label={labels.demoFocusWarning} />
             <DemoChip trigger="happy" label={labels.demoHappy} />
-            <button type="button" className="pref-chip-button" onClick={window.pawse.resetToday}>
+            <button type="button" className="pref-chip-button" onClick={window.pawpal.resetToday}>
               {labels.resetToday}
             </button>
           </div>
@@ -554,7 +554,7 @@ function DemoChip({ trigger, label }: { trigger: DemoTrigger; label: string }): 
     <button
       type="button"
       className="pref-chip-button"
-      onClick={() => window.pawse.triggerDemo(trigger)}
+      onClick={() => window.pawpal.triggerDemo(trigger)}
     >
       {label}
     </button>

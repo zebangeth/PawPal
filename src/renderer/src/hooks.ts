@@ -38,19 +38,19 @@ export function useSnapshot(): AppSnapshot {
 
   useEffect(() => {
     let mounted = true;
-    void window.pawse.getSnapshot().then((next) => {
+    void window.pawpal.getSnapshot().then((next) => {
       if (mounted) setSnapshot(next);
     });
-    const offPet = window.pawse.onPetState((petState) =>
+    const offPet = window.pawpal.onPetState((petState) =>
       setSnapshot((current) => ({ ...current, petState }))
     );
-    const offSettings = window.pawse.onSettingsUpdated((settings) =>
+    const offSettings = window.pawpal.onSettingsUpdated((settings) =>
       setSnapshot((current) => ({ ...current, settings }))
     );
-    const offStats = window.pawse.onStatsUpdated((stats) =>
+    const offStats = window.pawpal.onStatsUpdated((stats) =>
       setSnapshot((current) => ({ ...current, stats }))
     );
-    const offSnapshot = window.pawse.onSnapshot(setSnapshot);
+    const offSnapshot = window.pawpal.onSnapshot(setSnapshot);
     return () => {
       mounted = false;
       offPet();

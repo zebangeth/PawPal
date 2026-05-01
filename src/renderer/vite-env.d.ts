@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
 
-import type { PawseApi } from "../preload";
+import type { PawPalApi } from "../preload";
 
 declare global {
   interface Window {
-    pawse: PawseApi;
+    pawpal: PawPalApi;
   }
 }
