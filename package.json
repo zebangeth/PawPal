@@ -1,6 +1,6 @@
 {
   "name": "pawpal",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A tiny desktop dog that helps you pause before you burn out.",
   "author": "zebangeth",
   "license": "MIT",
@@ -10,7 +10,9 @@
     "dev": "electron-vite dev",
     "build": "pnpm typecheck && electron-vite build",
     "typecheck": "tsc --noEmit",
-    "dist": "pnpm build && electron-builder --mac dmg"
+    "dist": "pnpm build && electron-builder --mac --win",
+    "dist:mac": "pnpm build && electron-builder --mac",
+    "dist:win": "pnpm build && electron-builder --win"
   },
   "build": {
     "appId": "com.pawpal.app",

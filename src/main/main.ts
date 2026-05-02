@@ -1,6 +1,6 @@
 import { join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
-import { app, BrowserWindow, ipcMain, Menu, net, protocol, screen, Tray } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, nativeTheme, net, protocol, screen, Tray } from "electron";
 import Store from "electron-store";
 import {
   createEmptyStats,
@@ -393,6 +393,9 @@ function createTray(): void {
   tray.on("click", () => {
     tray?.popUpContextMenu();
   });
+  if (process.platform !== "darwin") {
+    nativeTheme.on("updated", () => tray?.setImage(createTrayImage()));
+  }
   updateTrayMenu();
 }
 
