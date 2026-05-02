@@ -317,8 +317,10 @@ function createPetWindow(): void {
     }
   });
 
-  petWindow.setAlwaysOnTop(true, "floating");
-  petWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  petWindow.setAlwaysOnTop(true, process.platform === "darwin" ? "floating" : "normal");
+  if (process.platform === "darwin") {
+    petWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  }
   loadRenderer(petWindow, "pet");
   petWindow.once("ready-to-show", () => {
     petWindow?.showInactive();
@@ -363,8 +365,9 @@ function createSettingsWindow(): void {
     minHeight: 400,
     show: false,
     backgroundColor: "#faf6ee",
-    titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 14, y: 14 },
+    ...(process.platform === "darwin"
+      ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 14, y: 14 } }
+      : {}),
     webPreferences: {
       preload: PRELOAD_PATH,
       contextIsolation: true,

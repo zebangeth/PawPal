@@ -26,6 +26,6 @@ export function createTrayImage(): Electron.NativeImage {
   fillCircle(11, 15, 7);
 
   const image = nativeImage.createFromBuffer(buf, { width: size, height: size });
-  image.setTemplateImage(true);
+  if (process.platform === "darwin") image.setTemplateImage(true);
   return image;
 }
