@@ -1,6 +1,6 @@
 import { join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
-import { app, BrowserWindow, ipcMain, Menu, nativeTheme, net, protocol, screen, Tray } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, nativeTheme, net, protocol, screen, shell, Tray } from "electron";
 import Store from "electron-store";
 import {
   createEmptyStats,
@@ -12,6 +12,8 @@ import { resolvePetAppearanceId } from "../shared/petAppearances";
 import type {
   AppSnapshot,
   BlockingMode,
+  ChatCompanionDiagnostics,
+  ChatProviderModelsResult,
   DistractionStatus,
   DemoTrigger,
   PetFacing,
@@ -27,13 +29,16 @@ import {
   BREAK_RUN_TICK_MS,
   DISTRACTION_CHECK_INTERVAL_MS,
   DISTRACTION_WARNING_COOLDOWN_MS,
+  CHAT_MODULE_ENABLED,
   IS_DEV,
-  PET_WINDOW,
+  PET_WINDOW_PROFILES,
   PRELOAD_PATH,
   RENDERER_HTML_PATH,
   SETTINGS_WINDOW,
   STORE_NAME
 } from "./config";
+import { normalizeChatSettings } from "./chat/config";
+import type { ChatModule, CompanionSession } from "./chat";
 import { classifyDistraction, isPermissionError, readActiveWindow } from "./distraction";
 import { createTrayImage } from "./trayIcon";
 
@@ -47,7 +52,10 @@ type StoreSchema = {
   stats: TodayStats;
   statsHistory: StatsHistory;
   petPosition?: PetPosition;
+  companionSession?: CompanionSession;
 };
+
+type PetWindowProfile = keyof typeof PET_WINDOW_PROFILES;
 
 app.setName(APP_NAME);
 
@@ -87,6 +95,7 @@ let breakRunFormatter: ((seconds: number) => string) | null = null;
 let nextBreakRunTurnAt = 0;
 let breakMutedToday = false;
 let dragOffset: PetPosition = { x: 0, y: 0 };
+let petWindowProfile: PetWindowProfile = "compact";
 let distractionStatus: DistractionStatus = {
   state: "idle",
   activeApp: "",
@@ -96,15 +105,17 @@ let distractionStatus: DistractionStatus = {
   lastWarningAt: null,
   error: null
 };
+let chatModule: ChatModule | null = null;
 
 function getSettings(): Settings {
   const stored = store.get("settings");
-  return {
+  const merged = {
     ...DEFAULT_SETTINGS,
     ...stored,
     language: resolveLanguage(stored.language),
     petAppearanceId: resolvePetAppearanceId(stored.petAppearanceId)
   };
+  return normalizeChatSettings(merged);
 }
 
 function text(): ReturnType<typeof i18n> {
@@ -112,17 +123,20 @@ function text(): ReturnType<typeof i18n> {
 }
 
 function setSettings(next: Settings): void {
-  const normalized = {
+  const base = {
     ...next,
     language: resolveLanguage(next.language),
     petAppearanceId: resolvePetAppearanceId(next.petAppearanceId)
   };
+  const normalized = chatModule?.normalizeSettings(base) ?? base;
   store.set("settings", normalized);
   sendToAll("settings:updated", normalized);
   settingsWindow?.setTitle(`${APP_NAME} ${text().menu.settings}`);
   scheduleReminderTimers();
   scheduleDistractionDetection();
+  chatModule?.scheduleTimers();
   updateTrayMenu();
+  publishSnapshot();
 }
 
 function getStatsHistory(): StatsHistory {
@@ -193,8 +207,19 @@ function snapshot(): AppSnapshot {
     petState,
     petFacing,
     blockingMode,
-    dogVisible: Boolean(petWindow?.isVisible()),
-    focusActive
+    pawpalVisible: Boolean(petWindow?.isVisible()),
+    focusActive,
+    chatCompanion: chatModule?.diagnostics() ?? emptyChatDiagnostics()
+  };
+}
+
+function emptyChatDiagnostics(): ChatCompanionDiagnostics {
+  return {
+    moduleEnabled: false,
+    session: store.get("companionSession") ?? null,
+    active: false,
+    conversationRounds: 0,
+    resetDueAt: null
   };
 }
 
@@ -214,9 +239,10 @@ function publishSnapshot(): void {
   sendToAll("app:snapshot", snapshot());
 }
 
-function setPetState(next: PetState): void {
-  petState = next;
-  sendToAll("pet:set-state", next);
+function setPetState(next: PetState, options: { ignoreChatLock?: boolean } = {}): void {
+  const chatLockedState = chatModule?.lockedState() ?? null;
+  petState = chatLockedState && !options.ignoreChatLock ? chatLockedState : next;
+  sendToAll("pet:set-state", petState);
 }
 
 function setPetFacing(next: PetFacing): void {
@@ -227,6 +253,7 @@ function setPetFacing(next: PetFacing): void {
 
 function showBubble(bubble: SpeechBubble): void {
   if (bubbleTimer) clearTimeout(bubbleTimer);
+  applyPetWindowProfile(bubble.input ? "chat" : "bubble");
   sendToPet("pet:show-bubble", bubble);
   if (bubble.autoDismissMs) {
     bubbleTimer = setTimeout(() => hideBubble(), bubble.autoDismissMs);
@@ -239,6 +266,7 @@ function hideBubble(): void {
     bubbleTimer = null;
   }
   sendToPet("pet:hide-bubble");
+  applyPetWindowProfile("compact");
 }
 
 function rendererUrl(route: "pet" | "settings"): string {
@@ -256,6 +284,23 @@ function loadRenderer(win: BrowserWindow, route: "pet" | "settings"): void {
   void win.loadFile(rendererUrl(route), { hash: route });
 }
 
+function openExternalUrl(value: string): void {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return;
+    void shell.openExternal(url.toString());
+  } catch {
+    // Ignore invalid URLs from renderer content.
+  }
+}
+
+function routeExternalLinks(win: BrowserWindow): void {
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    openExternalUrl(url);
+    return { action: "deny" };
+  });
+}
+
 function clampBoundsToWorkArea(bounds: Electron.Rectangle): Electron.Rectangle {
   const center = {
     x: bounds.x + Math.round(bounds.width / 2),
@@ -269,14 +314,40 @@ function clampBoundsToWorkArea(bounds: Electron.Rectangle): Electron.Rectangle {
   };
 }
 
+function petWindowProfileSize(profile = petWindowProfile): { width: number; height: number } {
+  return PET_WINDOW_PROFILES[profile];
+}
+
+function profileBoundsFromAnchor(
+  bounds: Electron.Rectangle,
+  profile: PetWindowProfile
+): Electron.Rectangle {
+  const size = petWindowProfileSize(profile);
+  return {
+    width: size.width,
+    height: size.height,
+    x: bounds.x + Math.round((bounds.width - size.width) / 2),
+    y: bounds.y + bounds.height - size.height
+  };
+}
+
+function applyPetWindowProfile(nextProfile: PetWindowProfile): void {
+  if (petWindowProfile === nextProfile) return;
+  petWindowProfile = nextProfile;
+  if (!petWindow || petWindow.isDestroyed()) return;
+  const nextBounds = clampBoundsToWorkArea(profileBoundsFromAnchor(petWindow.getBounds(), nextProfile));
+  petWindow.setBounds(nextBounds);
+}
+
 function initialPetBounds(): Electron.Rectangle {
   const workArea = screen.getPrimaryDisplay().workArea;
   const stored = store.get("petPosition");
+  const size = petWindowProfileSize("compact");
   const fallback = {
-    width: PET_WINDOW.width,
-    height: PET_WINDOW.height,
-    x: Math.round(workArea.x + workArea.width / 2 - PET_WINDOW.width / 2),
-    y: workArea.y + workArea.height - PET_WINDOW.height
+    width: size.width,
+    height: size.height,
+    x: Math.round(workArea.x + workArea.width / 2 - size.width / 2),
+    y: workArea.y + workArea.height - size.height
   };
 
   if (!stored) return fallback;
@@ -289,15 +360,15 @@ function initialPetBounds(): Electron.Rectangle {
 
 function persistPetPosition(): void {
   if (!petWindow || petWindow.isDestroyed()) return;
-  const bounds = petWindow.getBounds();
+  const bounds = profileBoundsFromAnchor(petWindow.getBounds(), "compact");
   store.set("petPosition", { x: bounds.x, y: bounds.y });
 }
 
 function createPetWindow(): void {
   const bounds = initialPetBounds();
   petWindow = new BrowserWindow({
-    width: PET_WINDOW.width,
-    height: PET_WINDOW.height,
+    width: bounds.width,
+    height: bounds.height,
     x: bounds.x,
     y: bounds.y,
     transparent: true,
@@ -322,11 +393,13 @@ function createPetWindow(): void {
   if (process.platform === "darwin") {
     petWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   }
+  routeExternalLinks(petWindow);
   loadRenderer(petWindow, "pet");
   petWindow.once("ready-to-show", () => {
     petWindow?.showInactive();
     updateTrayMenu();
     publishSnapshot();
+    chatModule?.restoreIfAvailable();
   });
   petWindow.on("show", () => {
     updateTrayMenu();
@@ -380,6 +453,7 @@ function createSettingsWindow(): void {
     }
   });
 
+  routeExternalLinks(settingsWindow);
   loadRenderer(settingsWindow, "settings");
   settingsWindow.once("ready-to-show", () => {
     settingsWindow?.show();
@@ -387,6 +461,27 @@ function createSettingsWindow(): void {
   });
   settingsWindow.on("closed", () => {
     settingsWindow = null;
+  });
+}
+
+async function initializeChatModule(): Promise<void> {
+  if (!CHAT_MODULE_ENABLED || chatModule) return;
+  const { createChatModule } = await import("./chat");
+  chatModule = createChatModule({
+    getSettings,
+    text,
+    getSession: () => store.get("companionSession"),
+    setSession: (session) => {
+      store.set("companionSession", session);
+      publishSnapshot();
+    },
+    showBubble,
+    hideBubble,
+    ensurePetWindowVisible,
+    setPetState,
+    fallbackPetState: () => (focusActive ? "focusGuard" : "idle"),
+    isBlockingMode: () => Boolean(blockingMode),
+    openSettingsWindow: createSettingsWindow
   });
 }
 
@@ -402,12 +497,41 @@ function createTray(): void {
   updateTrayMenu();
 }
 
-function actionMenuItems(): Electron.MenuItemConstructorOptions[] {
-  const dogVisible = Boolean(petWindow?.isVisible());
+function chatMenuItems(): Electron.MenuItemConstructorOptions[] {
+  if (!chatModule) return [];
   const labels = text().menu;
+  const chatVisible = chatModule.isChatVisible();
+  return [
+    { type: "separator" },
+    {
+      label: chatVisible ? labels.stopChat : labels.chatWithPawPal,
+      click: () => {
+        if (chatModule?.isChatVisible()) chatModule.hideChat();
+        else chatModule?.openChat();
+        updateTrayMenu();
+      }
+    },
+    ...(getSettings().chatCompanionEnabled
+      ? [
+          {
+            label: labels.resetChatSession,
+            click: () => {
+              chatModule?.resetSession();
+              updateTrayMenu();
+            }
+          }
+        ]
+      : [])
+  ];
+}
+
+function actionMenuItems(): Electron.MenuItemConstructorOptions[] {
+  const pawpalVisible = Boolean(petWindow?.isVisible());
+  const labels = text().menu;
+  const chatItems = chatMenuItems();
   return [
     {
-      label: dogVisible ? labels.hideDog : labels.showDog,
+      label: pawpalVisible ? labels.hidePawPal : labels.showPawPal,
       click: () => {
         if (!petWindow) createPetWindow();
         if (!petWindow) return;
@@ -424,6 +548,8 @@ function actionMenuItems(): Electron.MenuItemConstructorOptions[] {
         else startFocusMode();
       }
     },
+    ...chatItems,
+    ...(chatItems.length ? [{ type: "separator" as const }] : []),
     ...(app.isPackaged
       ? []
       : [
@@ -477,6 +603,7 @@ function updateTrayMenu(): void {
 
 function showPetContextMenu(): void {
   const labels = text().menu;
+  const chatItems = chatMenuItems();
   const template: Electron.MenuItemConstructorOptions[] = [
     { label: labels.settings, click: createSettingsWindow },
     {
@@ -486,6 +613,8 @@ function showPetContextMenu(): void {
         else startFocusMode();
       }
     },
+    ...chatItems,
+    ...(chatItems.length ? [{ type: "separator" as const }] : []),
     ...(app.isPackaged
       ? []
       : [
@@ -497,7 +626,7 @@ function showPetContextMenu(): void {
         ]),
     { type: "separator" },
     {
-      label: labels.hideDog,
+      label: labels.hidePawPal,
       click: () => {
         petWindow?.hide();
         updateTrayMenu();
@@ -512,9 +641,10 @@ function showPetContextMenu(): void {
 function movePetWithCursor(): void {
   if (!petWindow || petWindow.isDestroyed()) return;
   const cursor = screen.getCursorScreenPoint();
+  const size = petWindowProfileSize();
   const bounds = clampBoundsToWorkArea({
-    width: PET_WINDOW.width,
-    height: PET_WINDOW.height,
+    width: size.width,
+    height: size.height,
     x: cursor.x - dragOffset.x,
     y: cursor.y - dragOffset.y
   });
@@ -523,9 +653,10 @@ function movePetWithCursor(): void {
 
 function startPetDrag(offset: { offsetX: number; offsetY: number }): void {
   if (blockingMode === "breakRun" || !petWindow || petWindow.isDestroyed()) return;
+  const size = petWindowProfileSize();
   dragOffset = {
-    x: Math.min(Math.max(Math.round(offset.offsetX), 0), PET_WINDOW.width),
-    y: Math.min(Math.max(Math.round(offset.offsetY), 0), PET_WINDOW.height)
+    x: Math.min(Math.max(Math.round(offset.offsetX), 0), size.width),
+    y: Math.min(Math.max(Math.round(offset.offsetY), 0), size.height)
   };
   if (dragTimer) clearInterval(dragTimer);
   if (dragSafetyTimer) clearTimeout(dragSafetyTimer);
@@ -593,11 +724,12 @@ function movePetForBreakRun(): void {
     x: bounds.x + Math.round(bounds.width / 2),
     y: bounds.y + Math.round(bounds.height / 2)
   }).workArea;
+  const size = petWindowProfileSize();
   const now = Date.now();
   const minX = workArea.x + 8;
-  const maxX = workArea.x + workArea.width - PET_WINDOW.width - 8;
+  const maxX = workArea.x + workArea.width - size.width - 8;
   const minY = workArea.y + 8;
-  const maxY = workArea.y + workArea.height - PET_WINDOW.height - 8;
+  const maxY = workArea.y + workArea.height - size.height - 8;
 
   if (now >= nextBreakRunTurnAt && Math.random() < 0.45) {
     breakRunVelocity = chooseBreakRunVelocity();
@@ -645,6 +777,10 @@ function finishBreakRun(): void {
   setTimeout(() => {
     if (!blockingMode && !focusActive) {
       hideBubble();
+      if (chatModule?.restoreAfterReminder()) {
+        scheduleReminderTimers();
+        return;
+      }
       setPetState("idle");
       scheduleReminderTimers();
     }
@@ -774,6 +910,10 @@ function scheduleDistractionDetection(): void {
 function resumeLongTermState(): void {
   blockingMode = null;
   hideBubble();
+  if (chatModule?.restoreAfterReminder()) {
+    sendToAll("app:snapshot", snapshot());
+    return;
+  }
   if (focusActive) {
     setPetState("focusGuard");
     sendToAll("app:snapshot", snapshot());
@@ -804,6 +944,7 @@ function triggerBreakReminder(fromDemo: boolean): void {
     return;
   }
   ensurePetWindowVisible();
+  chatModule?.interruptForReminder();
   blockingMode = "break";
   breakDueAt = null;
   publishSnapshot();
@@ -826,6 +967,7 @@ function triggerHydrationReminder(fromDemo: boolean): void {
     return;
   }
   ensurePetWindowVisible();
+  chatModule?.interruptForReminder();
   blockingMode = "hydration";
   hydrationDueAt = null;
   publishSnapshot();
@@ -844,6 +986,7 @@ function triggerHydrationReminder(fromDemo: boolean): void {
 function triggerFocusWarning(rule?: string): void {
   if (blockingMode === "breakRun") return;
   ensurePetWindowVisible();
+  chatModule?.interruptForReminder();
   if (!focusActive) startFocusMode();
   blockingMode = "focusWarning";
   updateStats((stats) => ({ ...stats, focusWarnings: stats.focusWarnings + 1 }));
@@ -911,6 +1054,7 @@ function stopFocusMode(completed: boolean): void {
   setTimeout(() => {
     if (!focusActive && !blockingMode) {
       hideBubble();
+      if (chatModule?.restoreAfterReminder()) return;
       setPetState("idle");
     }
   }, 2900);
@@ -965,6 +1109,10 @@ function handleBubbleAction(actionId: string): void {
       showBubble({ id: "hydration-complete", message: pick(text().bubble.hydrationDone), autoDismissMs: 1800 });
       setTimeout(() => {
         hideBubble();
+        if (chatModule?.restoreAfterReminder()) {
+          scheduleReminderTimers();
+          return;
+        }
         setPetState(focusActive ? "focusGuard" : "idle");
         scheduleReminderTimers();
       }, 1900);
@@ -982,6 +1130,7 @@ function handleBubbleAction(actionId: string): void {
   if (actionId === "focus:back") {
     blockingMode = null;
     sendToAll("app:snapshot", snapshot());
+    if (chatModule?.restoreAfterReminder()) return;
     setPetState("focusGuard");
     showBubble({ id: "focus-back", message: pick(text().bubble.focusBack), autoDismissMs: 1800 });
     setTimeout(() => {
@@ -991,13 +1140,30 @@ function handleBubbleAction(actionId: string): void {
   }
   if (actionId === "focus:end") {
     stopFocusMode(false);
+    return;
   }
+  if (chatModule?.handleBubbleAction(actionId)) return;
 }
 
 function registerIpc(): void {
   ipcMain.handle("app:get-snapshot", () => snapshot());
+  if (chatModule) {
+    chatModule.registerIpc(ipcMain);
+  } else {
+    ipcMain.handle("companion:send-message", () => ({
+      ok: false,
+      error: "Chat module is disabled."
+    }));
+    ipcMain.handle("chat:list-models", (): ChatProviderModelsResult => ({
+      ok: false,
+      error: "Chat module is disabled."
+    }));
+    ipcMain.on("bubble:dismiss", hideBubble);
+    ipcMain.on("companion:activity", () => {});
+  }
   ipcMain.on("pet:clicked", () => {
     if (blockingMode) return;
+    if (chatModule?.handlePetClick()) return;
     happyFeedback(null);
   });
   ipcMain.on("pet:context-menu", showPetContextMenu);
@@ -1019,7 +1185,7 @@ protocol.registerSchemesAsPrivileged([
   { scheme: "pawpal-asset", privileges: { bypassCSP: true, supportFetchAPI: true } }
 ]);
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   protocol.handle("pawpal-asset", (request) => {
     let relativePath = "";
     try {
@@ -1042,11 +1208,13 @@ app.whenReady().then(() => {
   });
 
   getStats();
+  await initializeChatModule();
   registerIpc();
   createPetWindow();
   createTray();
   scheduleReminderTimers();
   scheduleDistractionDetection();
+  chatModule?.scheduleTimers();
   if (IS_DEV) {
     createSettingsWindow();
   }
@@ -1057,6 +1225,7 @@ app.whenReady().then(() => {
 });
 
 app.on("before-quit", () => {
+  chatModule?.clearTimers();
   for (const timer of [
     breakRunTimer,
     breakRunCountdownTimer,
