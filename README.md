@@ -14,7 +14,7 @@
   <img alt="License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" />
 </p>
 
-PawPal 是一个 macOS 桌面宠物应用。一只透明、始终置顶的小狗会陪在你的屏幕上，在你久坐、忘记喝水或者分心刷社交媒体时，温柔地把你带回节奏里。
+PawPal 是一个桌面宠物应用，支持 macOS 和 Windows。一只透明、始终置顶的小狗会陪在你的屏幕上，在你久坐、忘记喝水或者分心刷社交媒体时，温柔地把你带回节奏里。
 
 ## 功能
 
@@ -27,12 +27,19 @@ PawPal 是一个 macOS 桌面宠物应用。一只透明、始终置顶的小狗
 
 ## 安装
 
-### 下载 DMG（推荐）
+### 下载安装包（推荐）
 
-从 [Releases](../../releases) 页面下载最新的 `.dmg` 文件，拖入 Applications 即可使用。
+从 [Releases](../../releases) 页面下载对应平台的安装包：
 
-> 首次打开时 macOS 可能提示"无法验证开发者"，请在 系统设置 → 隐私与安全性 中允许打开。
-> 专注模式需要授予 Accessibility 权限。
+| 文件 | 适用设备 |
+|------|---------|
+| `PawPal-x.x.x-arm64.dmg` | macOS Apple Silicon (M1/M2/M3/M4) |
+| `PawPal-x.x.x-x64.dmg` | macOS Intel |
+| `PawPal.Setup.x.x.x.exe` | Windows (64-bit) |
+
+> **macOS**：首次打开时可能提示"无法验证开发者"，请在 系统设置 → 隐私与安全性 中允许打开。专注模式的分心检测需要授予 Accessibility 权限。
+>
+> **Windows**：分心检测功能暂不可用（目前仅支持 macOS），其他功能正常。
 
 ### 从源码运行
 
@@ -47,7 +54,9 @@ pnpm dev
 
 ```bash
 pnpm build        # 编译（含类型检查）
-pnpm dist         # 编译 + 打包为 .dmg
+pnpm dist         # 编译 + 打包 macOS 和 Windows
+pnpm dist:mac     # 仅打包 macOS
+pnpm dist:win     # 仅打包 Windows（需要 Wine 或在 Windows 上运行）
 ```
 
 ## 技术栈
@@ -85,7 +94,7 @@ pet_assets/     宠物动画素材（GIF）
 
 **A tiny desktop dog that helps you pause before you burn out.**
 
-PawPal is a macOS desktop pet app. A transparent, always-on-top dog lives on your screen and gently reminds you to take breaks, drink water, and stay focused.
+PawPal is a desktop pet app for macOS and Windows. A transparent, always-on-top dog lives on your screen and gently reminds you to take breaks, drink water, and stay focused.
 
 ### Features
 
@@ -98,7 +107,7 @@ PawPal is a macOS desktop pet app. A transparent, always-on-top dog lives on you
 
 ### Install
 
-Download the latest `.dmg` from [Releases](../../releases), or run from source:
+Download the latest installer from [Releases](../../releases) (`.dmg` for macOS, `.exe` for Windows), or run from source:
 
 ```bash
 git clone https://github.com/zebangeth/PawPal.git
