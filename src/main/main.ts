@@ -31,7 +31,7 @@ import {
   DISTRACTION_WARNING_COOLDOWN_MS,
   CHAT_MODULE_ENABLED,
   IS_DEV,
-  PET_WINDOW,
+  PET_WINDOW_PROFILES,
   PRELOAD_PATH,
   RENDERER_HTML_PATH,
   SETTINGS_WINDOW,
@@ -54,6 +54,8 @@ type StoreSchema = {
   petPosition?: PetPosition;
   companionSession?: CompanionSession;
 };
+
+type PetWindowProfile = keyof typeof PET_WINDOW_PROFILES;
 
 app.setName(APP_NAME);
 
@@ -93,6 +95,7 @@ let breakRunFormatter: ((seconds: number) => string) | null = null;
 let nextBreakRunTurnAt = 0;
 let breakMutedToday = false;
 let dragOffset: PetPosition = { x: 0, y: 0 };
+let petWindowProfile: PetWindowProfile = "compact";
 let distractionStatus: DistractionStatus = {
   state: "idle",
   activeApp: "",
@@ -250,6 +253,7 @@ function setPetFacing(next: PetFacing): void {
 
 function showBubble(bubble: SpeechBubble): void {
   if (bubbleTimer) clearTimeout(bubbleTimer);
+  applyPetWindowProfile(bubble.input ? "chat" : "bubble");
   sendToPet("pet:show-bubble", bubble);
   if (bubble.autoDismissMs) {
     bubbleTimer = setTimeout(() => hideBubble(), bubble.autoDismissMs);
@@ -262,6 +266,7 @@ function hideBubble(): void {
     bubbleTimer = null;
   }
   sendToPet("pet:hide-bubble");
+  applyPetWindowProfile("compact");
 }
 
 function rendererUrl(route: "pet" | "settings"): string {
@@ -309,14 +314,40 @@ function clampBoundsToWorkArea(bounds: Electron.Rectangle): Electron.Rectangle {
   };
 }
 
+function petWindowProfileSize(profile = petWindowProfile): { width: number; height: number } {
+  return PET_WINDOW_PROFILES[profile];
+}
+
+function profileBoundsFromAnchor(
+  bounds: Electron.Rectangle,
+  profile: PetWindowProfile
+): Electron.Rectangle {
+  const size = petWindowProfileSize(profile);
+  return {
+    width: size.width,
+    height: size.height,
+    x: bounds.x + Math.round((bounds.width - size.width) / 2),
+    y: bounds.y + bounds.height - size.height
+  };
+}
+
+function applyPetWindowProfile(nextProfile: PetWindowProfile): void {
+  if (petWindowProfile === nextProfile) return;
+  petWindowProfile = nextProfile;
+  if (!petWindow || petWindow.isDestroyed()) return;
+  const nextBounds = clampBoundsToWorkArea(profileBoundsFromAnchor(petWindow.getBounds(), nextProfile));
+  petWindow.setBounds(nextBounds);
+}
+
 function initialPetBounds(): Electron.Rectangle {
   const workArea = screen.getPrimaryDisplay().workArea;
   const stored = store.get("petPosition");
+  const size = petWindowProfileSize("compact");
   const fallback = {
-    width: PET_WINDOW.width,
-    height: PET_WINDOW.height,
-    x: Math.round(workArea.x + workArea.width / 2 - PET_WINDOW.width / 2),
-    y: workArea.y + workArea.height - PET_WINDOW.height
+    width: size.width,
+    height: size.height,
+    x: Math.round(workArea.x + workArea.width / 2 - size.width / 2),
+    y: workArea.y + workArea.height - size.height
   };
 
   if (!stored) return fallback;
@@ -329,15 +360,15 @@ function initialPetBounds(): Electron.Rectangle {
 
 function persistPetPosition(): void {
   if (!petWindow || petWindow.isDestroyed()) return;
-  const bounds = petWindow.getBounds();
+  const bounds = profileBoundsFromAnchor(petWindow.getBounds(), "compact");
   store.set("petPosition", { x: bounds.x, y: bounds.y });
 }
 
 function createPetWindow(): void {
   const bounds = initialPetBounds();
   petWindow = new BrowserWindow({
-    width: PET_WINDOW.width,
-    height: PET_WINDOW.height,
+    width: bounds.width,
+    height: bounds.height,
     x: bounds.x,
     y: bounds.y,
     transparent: true,
@@ -610,9 +641,10 @@ function showPetContextMenu(): void {
 function movePetWithCursor(): void {
   if (!petWindow || petWindow.isDestroyed()) return;
   const cursor = screen.getCursorScreenPoint();
+  const size = petWindowProfileSize();
   const bounds = clampBoundsToWorkArea({
-    width: PET_WINDOW.width,
-    height: PET_WINDOW.height,
+    width: size.width,
+    height: size.height,
     x: cursor.x - dragOffset.x,
     y: cursor.y - dragOffset.y
   });
@@ -621,9 +653,10 @@ function movePetWithCursor(): void {
 
 function startPetDrag(offset: { offsetX: number; offsetY: number }): void {
   if (blockingMode === "breakRun" || !petWindow || petWindow.isDestroyed()) return;
+  const size = petWindowProfileSize();
   dragOffset = {
-    x: Math.min(Math.max(Math.round(offset.offsetX), 0), PET_WINDOW.width),
-    y: Math.min(Math.max(Math.round(offset.offsetY), 0), PET_WINDOW.height)
+    x: Math.min(Math.max(Math.round(offset.offsetX), 0), size.width),
+    y: Math.min(Math.max(Math.round(offset.offsetY), 0), size.height)
   };
   if (dragTimer) clearInterval(dragTimer);
   if (dragSafetyTimer) clearTimeout(dragSafetyTimer);
@@ -691,11 +724,12 @@ function movePetForBreakRun(): void {
     x: bounds.x + Math.round(bounds.width / 2),
     y: bounds.y + Math.round(bounds.height / 2)
   }).workArea;
+  const size = petWindowProfileSize();
   const now = Date.now();
   const minX = workArea.x + 8;
-  const maxX = workArea.x + workArea.width - PET_WINDOW.width - 8;
+  const maxX = workArea.x + workArea.width - size.width - 8;
   const minY = workArea.y + 8;
-  const maxY = workArea.y + workArea.height - PET_WINDOW.height - 8;
+  const maxY = workArea.y + workArea.height - size.height - 8;
 
   if (now >= nextBreakRunTurnAt && Math.random() < 0.45) {
     breakRunVelocity = chooseBreakRunVelocity();

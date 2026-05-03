@@ -132,6 +132,7 @@ export function PetView(): JSX.Element {
   const facingClass = snapshot.petFacing === "left" ? "facing-left" : "facing-right";
   const appearanceId = snapshot.settings.petAppearanceId;
   const asset = getPetAsset(appearanceId, state, assetVariant, assetReplayKey);
+  const shellClass = `pet-shell${bubble ? " has-bubble" : ""}${bubble?.input ? " has-chat" : ""}`;
 
   function finishPointerDrag(clicked: boolean): void {
     const drag = dragRef.current;
@@ -242,7 +243,7 @@ export function PetView(): JSX.Element {
 
   return (
     <main
-      className="pet-shell"
+      className={shellClass}
       aria-label="PawPal desktop pet"
       onContextMenu={(event) => {
         event.preventDefault();

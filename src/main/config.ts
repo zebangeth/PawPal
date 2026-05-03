@@ -13,6 +13,21 @@ export const PET_WINDOW = {
   height: 340
 } as const;
 
+export const PET_WINDOW_PROFILES = {
+  compact: {
+    width: 220,
+    height: 220
+  },
+  bubble: {
+    width: 220,
+    height: 320
+  },
+  chat: {
+    width: 220,
+    height: 420
+  }
+} as const;
+
 export const SETTINGS_WINDOW = {
   width: 760,
   height: 680

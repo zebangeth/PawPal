@@ -30,11 +30,21 @@ textarea {
   background: transparent;
   display: flex;
   flex-direction: column;
-  height: 340px;
+  height: 220px;
   justify-content: flex-end;
   padding: 0 4px;
   pointer-events: none;
   position: relative;
+  width: 220px;
+}
+
+.pet-shell.has-bubble {
+  height: 320px;
+  width: 220px;
+}
+
+.pet-shell.has-chat {
+  height: 420px;
   width: 220px;
 }
 
