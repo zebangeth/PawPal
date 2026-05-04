@@ -2,6 +2,8 @@
 
 PawPal separates source code licensing from pet animation asset licensing.
 
+DeskPet M0/M1 imports PawPal assets only as validation placeholders. These assets are not treated as DeskPet's final product identity.
+
 ## Source Code
 
 The application source code is licensed under the MIT License. See `LICENSE`.

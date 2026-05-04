@@ -15,7 +15,6 @@ export type PetState =
   | "drinking"
   | "hydrationDone"
   | "focusGuard"
-  | "focusAlert"
   | "focusDone"
   | "sad"
   | "sleeping";
@@ -33,7 +32,7 @@ export type SpeechBubble = {
   autoDismissMs?: number;
 };
 
-export type BlockingMode = "break" | "breakRun" | "hydration" | "focusWarning" | null;
+export type BlockingMode = "break" | "breakRun" | "hydration" | null;
 
 export type Settings = {
   language: Language;
@@ -44,10 +43,6 @@ export type Settings = {
   hydrationReminderEnabled: boolean;
   hydrationIntervalMinutes: number;
   focusDurationMinutes: number;
-  distractionDetectionEnabled: boolean;
-  distractionGraceSeconds: number;
-  distractionBlockedApps: string[];
-  distractionBlockedKeywords: string[];
 };
 
 export type TodayStats = {
@@ -55,7 +50,6 @@ export type TodayStats = {
   breaksTaken: number;
   watersLogged: number;
   focusMinutes: number;
-  focusWarnings: number;
 };
 
 export type StatsHistory = Record<string, TodayStats>;
@@ -66,22 +60,11 @@ export type TimerStatus = {
   focusEndsAt: number | null;
 };
 
-export type DistractionStatus = {
-  state: "idle" | "watching" | "permission-needed" | "unsupported" | "error";
-  activeApp: string;
-  activeWindowTitle: string;
-  matchedRule: string | null;
-  lastCheckedAt: number | null;
-  lastWarningAt: number | null;
-  error: string | null;
-};
-
 export type AppSnapshot = {
   settings: Settings;
   stats: TodayStats;
   statsHistory: StatsHistory;
   timers: TimerStatus;
-  distraction: DistractionStatus;
   petState: PetState;
   petFacing: PetFacing;
   blockingMode: BlockingMode;
@@ -92,7 +75,6 @@ export type AppSnapshot = {
 export type DemoTrigger =
   | "break"
   | "hydration"
-  | "focusWarning"
   | "happy";
 
 export type RendererEventMap = {

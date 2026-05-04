@@ -26,12 +26,14 @@ jobs:
 
       - run: pnpm build
 
-      - name: Build Windows installer
-        run: pnpm exec electron-builder --win --publish never
+      - name: Build Windows portable artifacts
+        run: pnpm dist:win
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.exe
+          files: |
+            dist/*.zip
+            dist/*.exe
           generate_release_notes: true
           draft: true

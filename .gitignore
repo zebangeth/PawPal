@@ -2,7 +2,14 @@
 node_modules/
 out/
 dist/
+output/
+tmp/
 .pnpm-store/
 *.log
 _raw_assets/
+pet_assets/main_pixel_avatar/
+pet_assets/paired_pixel_avatar/
+docs/asset-pipeline.md
+specs/deskpet-m2-assets.md
+我/
 CLAUDE.md
