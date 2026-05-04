@@ -6,8 +6,7 @@ const initialStats: TodayStats = {
   date: "",
   breaksTaken: 0,
   watersLogged: 0,
-  focusMinutes: 0,
-  focusWarnings: 0
+  focusMinutes: 0
 };
 
 export function useSnapshot(): AppSnapshot {
@@ -19,15 +18,6 @@ export function useSnapshot(): AppSnapshot {
       breakDueAt: null,
       hydrationDueAt: null,
       focusEndsAt: null
-    },
-    distraction: {
-      state: "idle",
-      activeApp: "",
-      activeWindowTitle: "",
-      matchedRule: null,
-      lastCheckedAt: null,
-      lastWarningAt: null,
-      error: null
     },
     petState: "idle",
     petFacing: "right",

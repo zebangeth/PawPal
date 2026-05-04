@@ -4,7 +4,7 @@ import { i18n, LANGUAGE_OPTIONS, resolveLanguage } from "../../../shared/i18n";
 import { petAppearanceOptions, resolvePetAppearanceId } from "../../../shared/petAppearances";
 import type { DemoTrigger, PetAppearanceId, Settings } from "../../../shared/types";
 import { getPetAsset } from "../assets";
-import { distractionHelp, formatDistractionState, formatTimer, formatTimestamp, localeFor } from "../format";
+import { formatTimer, localeFor } from "../format";
 import { useNow, useSnapshot } from "../hooks";
 
 type SettingsCopy = ReturnType<typeof i18n>["settings"];
@@ -242,7 +242,7 @@ export function SettingsView(): JSX.Element {
       <header className="prefs__head">
         <img className="prefs__avatar" src={petAvatar.src} alt="" />
         <div className="prefs__intro">
-          <p className="prefs__eyebrow">PawPal</p>
+          <p className="prefs__eyebrow">DeskPet</p>
           <h1 className="prefs__title">{labels.today}</h1>
         </div>
       </header>
@@ -251,7 +251,6 @@ export function SettingsView(): JSX.Element {
         <StatCard label={labels.breaks} value={stats.breaksTaken} unit={labels.countUnit} />
         <StatCard label={labels.waters} value={stats.watersLogged} unit={labels.countUnit} />
         <StatCard label={labels.focusMin} value={stats.focusMinutes} unit={labels.minuteUnit} />
-        <StatCard label={labels.warnings} value={stats.focusWarnings} unit={labels.countUnit} />
       </section>
 
       {!draft.onboardingDismissed ? (
@@ -361,57 +360,6 @@ export function SettingsView(): JSX.Element {
             />
           }
         />
-        <Row
-          label={labels.enableDistractionDetection}
-          hint={
-            draft.distractionDetectionEnabled
-              ? labels.detectionFocusHelp
-              : labels.detectionOffHelp
-          }
-          control={
-            <ToggleControl
-              checked={draft.distractionDetectionEnabled}
-              onChange={(distractionDetectionEnabled) => updateDraft({ distractionDetectionEnabled })}
-              ariaLabel={labels.enableDistractionDetection}
-            />
-          }
-        />
-        {draft.distractionDetectionEnabled ? (
-          <>
-            <Row
-              label={labels.detectionGrace}
-              control={
-                <NumberControl
-                  value={draft.distractionGraceSeconds}
-                  min={0}
-                  max={120}
-                  unit={labels.secondUnit}
-                  onChange={(distractionGraceSeconds) => updateDraft({ distractionGraceSeconds })}
-                />
-              }
-            />
-            <Row
-              label={labels.blockedApps}
-              control={
-                <ChipsControl
-                  value={draft.distractionBlockedApps}
-                  labels={labels}
-                  onChange={(distractionBlockedApps) => updateDraft({ distractionBlockedApps })}
-                />
-              }
-            />
-            <Row
-              label={labels.blockedKeywords}
-              control={
-                <ChipsControl
-                  value={draft.distractionBlockedKeywords}
-                  labels={labels}
-                  onChange={(distractionBlockedKeywords) => updateDraft({ distractionBlockedKeywords })}
-                />
-              }
-            />
-          </>
-        ) : null}
         <div className="prefs__inline-actions">
           {snapshot.focusActive ? (
             <button type="button" className="pref-button" onClick={window.pawpal.stopFocus}>
@@ -431,7 +379,6 @@ export function SettingsView(): JSX.Element {
           <div className="test-tools">
             <DemoChip trigger="break" label={labels.demoBreak} />
             <DemoChip trigger="hydration" label={labels.demoWater} />
-            <DemoChip trigger="focusWarning" label={labels.demoFocusWarning} />
             <DemoChip trigger="happy" label={labels.demoHappy} />
             <button type="button" className="pref-chip-button" onClick={window.pawpal.resetToday}>
               {labels.resetToday}
@@ -468,30 +415,6 @@ export function SettingsView(): JSX.Element {
                 value={snapshot.dogVisible ? labels.visible : labels.hidden}
               />
             </DiagGroup>
-
-            <DiagGroup title={labels.distraction}>
-              <DiagCard
-                label={labels.status}
-                value={formatDistractionState(snapshot.distraction.state, labels)}
-              />
-              <DiagCard
-                label={labels.matched}
-                value={snapshot.distraction.matchedRule ?? labels.none}
-              />
-              <DiagCard
-                label={labels.app}
-                value={snapshot.distraction.activeApp || labels.none}
-              />
-              <DiagCard
-                label={labels.checked}
-                value={formatTimestamp(snapshot.distraction.lastCheckedAt, language, labels)}
-              />
-            </DiagGroup>
-
-            {snapshot.distraction.activeWindowTitle ? (
-              <p className="prefs__diag-note">{snapshot.distraction.activeWindowTitle}</p>
-            ) : null}
-            <p className="prefs__diag-hint">{distractionHelp(snapshot, labels)}</p>
 
             <DiagGroup title={labels.timers}>
               <DiagCard

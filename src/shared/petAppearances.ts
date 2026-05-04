@@ -57,7 +57,6 @@ export const PET_APPEARANCES: Record<PetAppearanceId, PetAppearanceManifest> = {
       hydrationPrompt: { path: goldenPuppy("hydrationPrompt", "want_water.gif") },
       drinking: { path: goldenPuppy("drinking", "got_water.gif") },
       focusGuard: { path: goldenPuppy("focusGuard", "standing pose4.gif") },
-      focusAlert: { path: goldenPuppy("focusAlert", "2 - standing reminder.gif") },
       sad: { path: goldenPuppy("sad", "4 - sleeping.gif"), isPlaceholder: true },
       sleeping: { path: goldenPuppy("sleeping", "4 - sleeping.gif"), isPlaceholder: true }
     }
@@ -126,15 +125,6 @@ export const PET_APPEARANCES: Record<PetAppearanceId, PetAppearanceManifest> = {
           lineDog("focusGuard", "线条小狗第17弹_工作.gif"),
           lineDog("focusGuard", "线条小狗第2弹_努力.gif"),
           lineDog("focusGuard", "线条小狗第9弹_甩耳朵.gif")
-        ]
-      },
-      focusAlert: {
-        path: [
-          lineDog("focusAlert", "线条小狗第15弹_惊.gif"),
-          lineDog("focusAlert", "线条小狗第15弹_疑问.gif"),
-          lineDog("focusAlert", "线条小狗第1弹_什么.gif"),
-          lineDog("focusAlert", "线条小狗第1弹_哼.gif"),
-          lineDog("focusAlert", "线条小狗第3弹_不要.gif")
         ]
       },
       focusDone: {

@@ -16,95 +16,54 @@ export function pick<T>(items: readonly T[]): T {
 export const I18N = {
   "zh-CN": {
     bubble: {
-      woof: ["woof!", "汪！", "汪汪~"],
+      woof: ["汪!", "陪你一下~", "我在这儿"],
       breakReminder: [
-        "坐太久啦，去走一分钟吧",
-        "我想和你玩儿一会儿，去走一分钟吧",
-        "坐了好久了……去走一分钟吧！",
-        "我想玩儿了，去走一分钟吧"
+        "坐太久了，起来走一分钟吧",
+        "我想活动一下，你也一起吧",
+        "休息一下眼睛和肩膀吧"
       ],
-      breakDone: [
-        "好耶！摇尾巴~",
-        "耶耶耶 好喜欢你",
-        "开心！"
-      ],
+      breakDone: ["好耶，休息完成", "回来啦，继续陪你", "状态恢复中"],
       breakRun: [
-        (seconds: number) => `我还要玩 ${seconds} 秒！快离开屏幕~`,
-        (seconds: number) => `倒计时 ${seconds} 秒，别偷偷回来哦`,
-        (seconds: number) => `${seconds} 秒！`
+        (seconds: number) => `再活动 ${seconds} 秒，先别回屏幕前~`,
+        (seconds: number) => `倒计时 ${seconds} 秒，走动一下吧`
       ],
-      breakRunComplete: [
-        "玩够啦，回来陪你坐会儿~",
-        "回来啦！我在等你呢",
-        "休息完毕，蹲好了~"
-      ],
-      breakIgnore: [
-        "好吧……但我会担心你的",
-        "呜……那你下次一定站起来",
-        "好吧，我先趴着等你……"
-      ],
-      hydrationReminder: [
-        "我有点渴了……你也喝口水吧？",
-        "想喝水了！你也来一口嘛",
-        "舔舔嘴……该喝水啦",
-        "水碗空了！你的杯子呢？"
-      ],
-      hydrationDone: [
-        "咕嘟咕嘟，舒服~",
-        "喝饱啦！",
-        "汪，水真好喝"
-      ],
+      breakRunComplete: ["休息完成，回来坐好吧", "我回来了，继续陪你"],
+      breakIgnore: ["好吧，今天先放过你", "那下次记得站起来"],
+      hydrationReminder: ["喝口水吧", "水杯该出场了", "补一点水再继续"],
+      hydrationDone: ["喝水完成", "水分补给到位", "很好，继续"],
       focusStart: [
-        (minutes: number) => `好，我帮你看着这 ${minutes} 分钟！`,
-        (minutes: number) => `专心${minutes} 分钟，我盯着`
+        (minutes: number) => `开始 ${minutes} 分钟专注计时，我会陪着你`,
+        (minutes: number) => `专注 ${minutes} 分钟，只做计时提醒`
       ],
-      focusWarning: [
-        (rule: string) => `说好专注的，不许看 ${rule}`,
-        (rule: string) => `走神啦！${rule} 不能玩`,
-        (rule: string) => `你怎么在偷偷看 ${rule} 了`,
-      ],
-      focusComplete: [
-        "专心时间到！",
-        "专心结束！摇尾巴~",
-      ],
-      focusCancelled: [
-        "好，我陪你歇会儿",
-        "收工！我趴下啦"
-      ],
-      focusBack: [
-        "好，我继续盯着~",
-        "嗯！回去干活吧",
-        "我也继续专心啦"
-      ]
+      focusComplete: ["专注时间到", "计时结束，休息一下吧"],
+      focusCancelled: ["专注已停止", "计时取消了"]
     },
     actions: {
       breakDone: "我站起来了",
       breakRunDone: "我回来了",
       breakSnooze: "10 分钟后提醒",
-      breakMute: "今天先别管我",
+      breakMute: "今天先别提醒",
       hydrationDone: "我喝水了",
       hydrationSnooze: "稍后提醒",
-      focusBack: "回去工作",
       focusEnd: "结束专注"
     },
     menu: {
-      showDog: "显示小狗",
-      hideDog: "隐藏小狗",
-      startFocusMode: "开始专注模式",
-      stopFocusMode: "停止专注模式",
-      demoBreakReminder: "演示：休息提醒",
-      demoHydrationReminder: "演示：喝水提醒",
-      demoFocusWarning: "演示：分心提醒",
-      demoHappyReaction: "演示：开心反馈",
+      showDog: "显示宠物",
+      hideDog: "隐藏宠物",
+      startFocusMode: "开始专注计时",
+      stopFocusMode: "停止专注计时",
+      demoBreakReminder: "演示: 休息提醒",
+      demoHydrationReminder: "演示: 喝水提醒",
+      demoHappyReaction: "演示: 开心反馈",
       settings: "设置",
       resetToday: "重置今日",
       quit: "退出"
     },
     settings: {
       title: "设置",
-      welcomeTitle: "欢迎使用 PawPal",
+      welcomeTitle: "欢迎使用 DeskPet",
       welcomeCopy:
-        "PawPal 会住在菜单栏和屏幕底部，定时提醒你休息、喝水和保持专注。分心检测目前仅支持 macOS，需要在系统设置里允许辅助功能权限。",
+        "DeskPet 会在桌面上陪你，提醒你休息、喝水，并提供手动专注计时。它不会读取当前打开的应用、窗口标题、进程、截图或输入。",
       dismissWelcome: "知道了",
       appearance: "外观",
       quickActions: "快捷操作",
@@ -118,35 +77,21 @@ export const I18N = {
       hydrationInterval: "喝水间隔",
       focus: "专注",
       focusDuration: "专注时长",
-      enableDistractionDetection: "开启分心检测",
-      detectionGrace: "检测宽限时间",
-      blockedApps: "屏蔽应用",
-      blockedKeywords: "屏蔽关键词",
       today: "今日",
       breaks: "休息",
       waters: "喝水",
       focusMin: "专注",
-      warnings: "分心",
       minuteUnit: "分钟",
       secondUnit: "秒",
       countUnit: "次",
-      addListItem: "添加…",
+      addListItem: "添加...",
       removeListItem: (entry: string) => `移除 ${entry}`,
       runtime: "运行状态",
       state: "状态",
       mode: "模式",
       reminder: "提醒",
-      dog: "小狗",
-      distraction: "分心检测",
+      dog: "宠物",
       status: "状态",
-      statusIdle: "未运行",
-      statusWatching: "检测中",
-      statusPermissionNeeded: "需要权限",
-      statusUnsupported: "当前系统不支持",
-      statusError: "检测异常",
-      matched: "命中",
-      app: "应用",
-      checked: "检查时间",
       timers: "计时器",
       break: "休息",
       water: "喝水",
@@ -155,7 +100,6 @@ export const I18N = {
       demo: "演示",
       demoBreak: "休息",
       demoWater: "喝水",
-      demoFocusWarning: "分心提醒",
       demoHappy: "开心",
       resetToday: "重置今日",
       startFocus: "开始专注",
@@ -170,102 +114,49 @@ export const I18N = {
       none: "无",
       visible: "显示",
       hidden: "隐藏",
-      idle: "空闲",
-      noActiveWindowTitle: "还没有捕获到当前窗口标题。",
-      detectionOffHelp: "分心检测已关闭。开启后保存，即可预览当前活动窗口。",
-      detectionWaitingHelp: "正在等待第一次活动窗口检查。",
-      detectionPermissionHelp:
-        "需要在系统设置里允许 PawPal 获取辅助功能权限（macOS），然后重启应用或重新开启分心检测。",
-      detectionUnsupportedHelp: "当前系统暂不支持活动窗口检测，分心检测会保持关闭状态。",
-      detectionErrorHelp: "活动窗口检测暂时失败。请检查权限后，重新开启分心检测或重启应用。",
-      detectionPreviewHelp: "正在预览当前活动窗口。开始专注后，命中规则会触发分心提醒。",
-      detectionFocusHelp: "专注期间正在检测。命中屏蔽应用或关键词会触发分心提醒。"
-    },
-    system: {
-      unsupportedDistraction: "分心检测目前仅支持 macOS。"
+      idle: "空闲"
     }
   },
   en: {
     bubble: {
-      woof: ["woof!", "bark bark!", "arf~"],
+      woof: ["woof!", "I'm here~", "keeping you company"],
       breakReminder: [
-        "You've been sitting too long, walk for a minute!",
-        "I wanna play with you~ walk for a minute!",
-        "Sitting for so long… go walk for a minute!",
-        "I wanna play! Walk for a minute~"
+        "You've been sitting for a while. Walk for a minute?",
+        "Let's move around for a minute.",
+        "Rest your eyes and shoulders for a bit."
       ],
-      breakDone: [
-        "Yay! *tail wag*",
-        "Yay yay yay I like you so much",
-        "Happy!"
-      ],
+      breakDone: ["Nice break!", "Back with you.", "Reset complete."],
       breakRun: [
-        (seconds: number) => `I still wanna play for ${seconds}s! Get away from the screen~`,
-        (seconds: number) => `${seconds}s left, no sneaking back!`,
-        (seconds: number) => `${seconds}s!`
+        (seconds: number) => `${seconds}s left. Stay away from the screen~`,
+        (seconds: number) => `Move around for ${seconds}s.`
       ],
-      breakRunComplete: [
-        "Done playing~ sitting back down with you",
-        "I'm back! Was waiting for you~",
-        "Break's over, all settled down~"
-      ],
-      breakIgnore: [
-        "Okay… but I'll worry about you",
-        "Hmm… you have to stand up next time",
-        "Fine, I'll lie here and wait…"
-      ],
-      hydrationReminder: [
-        "I'm a little thirsty… you should drink some water too?",
-        "I want water! You have some too~",
-        "*licks lips* …time for water~",
-        "My bowl's empty! Where's your cup?"
-      ],
-      hydrationDone: [
-        "*slurp slurp* ahh~",
-        "All full!",
-        "Woof, water's so good"
-      ],
+      breakRunComplete: ["Break complete. Come back when ready.", "I'm back with you."],
+      breakIgnore: ["Okay, skipping reminders for today.", "Remember to stand next time."],
+      hydrationReminder: ["Drink some water.", "Time for your cup.", "Hydrate before continuing."],
+      hydrationDone: ["Water logged.", "Hydration done.", "Good, keep going."],
       focusStart: [
-        (minutes: number) => `Okay, I'll keep watch for ${minutes} minutes!`,
-        (minutes: number) => `Focus for ${minutes} minutes, I'm watching`
+        (minutes: number) => `Starting a ${minutes}-minute manual focus timer.`,
+        (minutes: number) => `Focus timer: ${minutes} minutes.`
       ],
-      focusWarning: [
-        (rule: string) => `Hey, no ${rule}! We said we'd focus!`,
-        (rule: string) => `I saw you open ${rule}~ come back!`,
-        (rule: string) => `Stay away from ${rule}!`
-      ],
-      focusComplete: [
-        "Focus time's up!",
-        "Focus done! *tail wag*"
-      ],
-      focusCancelled: [
-        "Okay, I'll keep you company for a bit",
-        "All done! I'm lying down~"
-      ],
-      focusBack: [
-        "Good, I'll keep watching~",
-        "Mm! Back to work then",
-        "I'll keep focusing too~"
-      ]
+      focusComplete: ["Focus time is up.", "Timer done. Take a short break."],
+      focusCancelled: ["Focus stopped.", "Timer cancelled."]
     },
     actions: {
       breakDone: "I stood up",
       breakRunDone: "I'm back",
       breakSnooze: "Remind in 10 min",
-      breakMute: "Leave me today",
+      breakMute: "Skip today",
       hydrationDone: "I drank water",
       hydrationSnooze: "Remind later",
-      focusBack: "Back to work",
       focusEnd: "End Focus"
     },
     menu: {
-      showDog: "Show Dog",
-      hideDog: "Hide Dog",
-      startFocusMode: "Start Focus Mode",
-      stopFocusMode: "Stop Focus Mode",
+      showDog: "Show Pet",
+      hideDog: "Hide Pet",
+      startFocusMode: "Start Focus Timer",
+      stopFocusMode: "Stop Focus Timer",
       demoBreakReminder: "Demo: Break Reminder",
       demoHydrationReminder: "Demo: Hydration Reminder",
-      demoFocusWarning: "Demo: Distraction Nudge",
       demoHappyReaction: "Demo: Happy Reaction",
       settings: "Settings",
       resetToday: "Reset Today",
@@ -273,9 +164,9 @@ export const I18N = {
     },
     settings: {
       title: "Settings",
-      welcomeTitle: "Welcome to PawPal",
+      welcomeTitle: "Welcome to DeskPet",
       welcomeCopy:
-        "PawPal lives in the menu bar and near the bottom of your screen. It reminds you to take breaks, drink water, and stay focused. Distraction detection is macOS-only and requires accessibility permissions.",
+        "DeskPet keeps you company on the desktop, reminds you to rest and drink water, and provides a manual focus timer. It does not read open apps, window titles, processes, screenshots, or input.",
       dismissWelcome: "Got it",
       appearance: "Appearance",
       quickActions: "Quick Actions",
@@ -289,35 +180,21 @@ export const I18N = {
       hydrationInterval: "Hydration Interval",
       focus: "Focus",
       focusDuration: "Focus Duration",
-      enableDistractionDetection: "Enable Distraction Detection",
-      detectionGrace: "Detection Grace",
-      blockedApps: "Blocked Apps",
-      blockedKeywords: "Blocked Keywords",
       today: "Today",
       breaks: "Breaks",
-      waters: "Waters",
+      waters: "Water",
       focusMin: "Focus",
-      warnings: "Distractions",
       minuteUnit: "min",
       secondUnit: "s",
       countUnit: "",
-      addListItem: "Add…",
+      addListItem: "Add...",
       removeListItem: (entry: string) => `Remove ${entry}`,
       runtime: "Runtime",
       state: "State",
       mode: "Mode",
       reminder: "Reminder",
-      dog: "Dog",
-      distraction: "Distraction",
+      dog: "Pet",
       status: "Status",
-      statusIdle: "Idle",
-      statusWatching: "Watching",
-      statusPermissionNeeded: "Permission needed",
-      statusUnsupported: "Unsupported",
-      statusError: "Detection error",
-      matched: "Matched",
-      app: "App",
-      checked: "Checked",
       timers: "Timers",
       break: "Break",
       water: "Water",
@@ -326,7 +203,6 @@ export const I18N = {
       demo: "Demo",
       demoBreak: "Break",
       demoWater: "Water",
-      demoFocusWarning: "Distraction",
       demoHappy: "Happy",
       resetToday: "Reset Today",
       startFocus: "Start Focus",
@@ -341,23 +217,7 @@ export const I18N = {
       none: "none",
       visible: "visible",
       hidden: "hidden",
-      idle: "idle",
-      noActiveWindowTitle: "No active window title captured yet.",
-      detectionOffHelp: "Detection is off. Enable it and Save to preview the active window.",
-      detectionWaitingHelp: "Waiting for the first active-window check.",
-      detectionPermissionHelp:
-        "Allow PawPal accessibility permissions in System Settings (macOS), then restart the app or toggle detection again.",
-      detectionUnsupportedHelp:
-        "Active-window detection is not supported on this system yet, so distraction detection will stay inactive.",
-      detectionErrorHelp:
-        "Active-window detection failed. Check permissions, then toggle detection again or restart the app.",
-      detectionPreviewHelp:
-        "Previewing the active window. Start Focus to trigger distraction nudges from matched rules.",
-      detectionFocusHelp:
-        "Watching during Focus. Matched blocked apps or keywords will trigger a distraction nudge."
-    },
-    system: {
-      unsupportedDistraction: "Distraction detection currently supports macOS only."
+      idle: "idle"
     }
   }
 } as const;

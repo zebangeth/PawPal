@@ -100,9 +100,6 @@ textarea {
   transform: rotate(-2deg);
 }
 
-.state-focusAlert {
-}
-
 .speech-bubble {
   background: rgba(255, 252, 244, 0.96);
   border: 1px solid rgba(76, 57, 39, 0.14);

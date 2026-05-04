@@ -12,7 +12,6 @@ import { resolvePetAppearanceId } from "../shared/petAppearances";
 import type {
   AppSnapshot,
   BlockingMode,
-  DistractionStatus,
   DemoTrigger,
   PetFacing,
   PetState,
@@ -25,8 +24,6 @@ import {
   APP_NAME,
   BREAK_RUN_DURATION_MS,
   BREAK_RUN_TICK_MS,
-  DISTRACTION_CHECK_INTERVAL_MS,
-  DISTRACTION_WARNING_COOLDOWN_MS,
   IS_DEV,
   PET_WINDOW,
   PRELOAD_PATH,
@@ -34,7 +31,6 @@ import {
   SETTINGS_WINDOW,
   STORE_NAME
 } from "./config";
-import { classifyDistraction, isPermissionError, readActiveWindow } from "./distraction";
 import { createTrayImage } from "./trayIcon";
 
 type PetPosition = {
@@ -50,6 +46,11 @@ type StoreSchema = {
 };
 
 app.setName(APP_NAME);
+
+const smokeUserDataPath = process.env.DESKPET_USER_DATA_DIR;
+if (smokeUserDataPath) {
+  app.setPath("userData", resolve(smokeUserDataPath));
+}
 
 const store = new Store<StoreSchema>({
   name: STORE_NAME,
@@ -74,8 +75,6 @@ let breakRunMovementTimer: NodeJS.Timeout | null = null;
 let breakTimer: NodeJS.Timeout | null = null;
 let hydrationTimer: NodeJS.Timeout | null = null;
 let focusTimer: NodeJS.Timeout | null = null;
-let distractionTimer: NodeJS.Timeout | null = null;
-let distractionStartupTimer: NodeJS.Timeout | null = null;
 let breakDueAt: number | null = null;
 let hydrationDueAt: number | null = null;
 let focusEndsAt: number | null = null;
@@ -87,16 +86,6 @@ let breakRunFormatter: ((seconds: number) => string) | null = null;
 let nextBreakRunTurnAt = 0;
 let breakMutedToday = false;
 let dragOffset: PetPosition = { x: 0, y: 0 };
-let distractionStatus: DistractionStatus = {
-  state: "idle",
-  activeApp: "",
-  activeWindowTitle: "",
-  matchedRule: null,
-  lastCheckedAt: null,
-  lastWarningAt: null,
-  error: null
-};
-
 function getSettings(): Settings {
   const stored = store.get("settings");
   return {
@@ -121,7 +110,6 @@ function setSettings(next: Settings): void {
   sendToAll("settings:updated", normalized);
   settingsWindow?.setTitle(`${APP_NAME} ${text().menu.settings}`);
   scheduleReminderTimers();
-  scheduleDistractionDetection();
   updateTrayMenu();
 }
 
@@ -135,8 +123,7 @@ function isSameStats(left: TodayStats | undefined, right: TodayStats): boolean {
       left.date === right.date &&
       left.breaksTaken === right.breaksTaken &&
       left.watersLogged === right.watersLogged &&
-      left.focusMinutes === right.focusMinutes &&
-      left.focusWarnings === right.focusWarnings
+      left.focusMinutes === right.focusMinutes
   );
 }
 
@@ -189,7 +176,6 @@ function snapshot(): AppSnapshot {
       hydrationDueAt,
       focusEndsAt
     },
-    distraction: distractionStatus,
     petState,
     petFacing,
     blockingMode,
@@ -430,7 +416,6 @@ function actionMenuItems(): Electron.MenuItemConstructorOptions[] {
           { type: "separator" as const },
           { label: labels.demoBreakReminder, click: () => triggerDemo("break") },
           { label: labels.demoHydrationReminder, click: () => triggerDemo("hydration") },
-          { label: labels.demoFocusWarning, click: () => triggerDemo("focusWarning") },
           { label: labels.demoHappyReaction, click: () => triggerDemo("happy") }
         ]),
     { type: "separator" },
@@ -492,7 +477,6 @@ function showPetContextMenu(): void {
           { type: "separator" as const },
           { label: labels.demoBreakReminder, click: () => triggerDemo("break") },
           { label: labels.demoHydrationReminder, click: () => triggerDemo("hydration") },
-          { label: labels.demoFocusWarning, click: () => triggerDemo("focusWarning") },
           { label: labels.demoHappyReaction, click: () => triggerDemo("happy") }
         ]),
     { type: "separator" },
@@ -694,83 +678,6 @@ function scheduleReminderTimers(): void {
   publishSnapshot();
 }
 
-function setDistractionStatus(partial: Partial<DistractionStatus>): void {
-  distractionStatus = { ...distractionStatus, ...partial };
-  publishSnapshot();
-}
-
-async function checkDistractionNow(): Promise<void> {
-  const settings = getSettings();
-  if (!settings.distractionDetectionEnabled) return;
-
-  try {
-    const active = await readActiveWindow();
-    const matchedRule = classifyDistraction(active, settings);
-    const now = Date.now();
-
-    setDistractionStatus({
-      state: "watching",
-      activeApp: active.appName,
-      activeWindowTitle: active.windowTitle,
-      matchedRule,
-      lastCheckedAt: now,
-      error: null
-    });
-
-    if (!focusActive || blockingMode === "focusWarning") return;
-    if (!matchedRule) return;
-    if (
-      distractionStatus.lastWarningAt &&
-      now - distractionStatus.lastWarningAt < DISTRACTION_WARNING_COOLDOWN_MS
-    ) {
-      return;
-    }
-
-    setDistractionStatus({ lastWarningAt: now });
-    triggerFocusWarning(matchedRule.replace(/^(app|keyword):/, ""));
-  } catch (error) {
-    setDistractionStatus({
-      state: isPermissionError(error) ? "permission-needed" : "error",
-      error: error instanceof Error ? error.message : String(error),
-      lastCheckedAt: Date.now()
-    });
-  }
-}
-
-function scheduleDistractionDetection(): void {
-  if (distractionTimer) {
-    clearInterval(distractionTimer);
-    distractionTimer = null;
-  }
-  if (distractionStartupTimer) {
-    clearTimeout(distractionStartupTimer);
-    distractionStartupTimer = null;
-  }
-
-  const settings = getSettings();
-  if (!settings.distractionDetectionEnabled) {
-    setDistractionStatus({
-      state: "idle",
-      matchedRule: null,
-      error: null
-    });
-    return;
-  }
-
-  setDistractionStatus({
-    state: process.platform === "darwin" ? "watching" : "unsupported",
-    error: process.platform === "darwin" ? null : text().system.unsupportedDistraction
-  });
-
-  if (process.platform !== "darwin") return;
-
-  const firstCheckDelay = focusActive ? Math.max(0, settings.distractionGraceSeconds * 1000) : 0;
-  distractionStartupTimer = setTimeout(() => {
-    void checkDistractionNow();
-    distractionTimer = setInterval(() => void checkDistractionNow(), DISTRACTION_CHECK_INTERVAL_MS);
-  }, firstCheckDelay);
-}
-
 function resumeLongTermState(): void {
   blockingMode = null;
   hideBubble();
@@ -798,7 +705,7 @@ function happyFeedback(message: string | null = pick(text().bubble.woof), after?
 }
 
 function triggerBreakReminder(fromDemo: boolean): void {
-  if (blockingMode === "focusWarning" || blockingMode === "breakRun") return;
+  if (blockingMode === "breakRun") return;
   if (!fromDemo && (focusActive || breakMutedToday)) {
     scheduleReminderTimers();
     return;
@@ -841,25 +748,6 @@ function triggerHydrationReminder(fromDemo: boolean): void {
   });
 }
 
-function triggerFocusWarning(rule?: string): void {
-  if (blockingMode === "breakRun") return;
-  ensurePetWindowVisible();
-  if (!focusActive) startFocusMode();
-  blockingMode = "focusWarning";
-  updateStats((stats) => ({ ...stats, focusWarnings: stats.focusWarnings + 1 }));
-  setPetState("focusAlert");
-  sendToAll("app:snapshot", snapshot());
-  const labels = text();
-  showBubble({
-    id: "focus-warning",
-    message: pick(labels.bubble.focusWarning)(rule ?? "?"),
-    actions: [
-      { id: "focus:back", label: labels.actions.focusBack, kind: "primary" },
-      { id: "focus:end", label: labels.actions.focusEnd }
-    ]
-  });
-}
-
 function startFocusMode(): void {
   if (focusActive || blockingMode) return;
   ensurePetWindowVisible();
@@ -880,7 +768,6 @@ function startFocusMode(): void {
     () => stopFocusMode(true),
     settings.focusDurationMinutes * 60 * 1000
   );
-  scheduleDistractionDetection();
   updateTrayMenu();
 }
 
@@ -896,7 +783,6 @@ function stopFocusMode(completed: boolean): void {
     focusTimer = null;
   }
   focusEndsAt = null;
-  scheduleDistractionDetection();
   updateStats((stats) => ({
     ...stats,
     focusMinutes: stats.focusMinutes + elapsedMinutes
@@ -921,7 +807,6 @@ function triggerDemo(trigger: DemoTrigger): void {
   ensurePetWindowVisible();
   if (trigger === "break") triggerBreakReminder(true);
   if (trigger === "hydration") triggerHydrationReminder(true);
-  if (trigger === "focusWarning") triggerFocusWarning("Twitter");
   if (trigger === "happy") happyFeedback(pick(text().bubble.woof));
 }
 
@@ -977,16 +862,6 @@ function handleBubbleAction(actionId: string): void {
     hydrationDueAt = Date.now() + 15 * 60 * 1000;
     hydrationTimer = setTimeout(() => triggerHydrationReminder(false), 15 * 60 * 1000);
     publishSnapshot();
-    return;
-  }
-  if (actionId === "focus:back") {
-    blockingMode = null;
-    sendToAll("app:snapshot", snapshot());
-    setPetState("focusGuard");
-    showBubble({ id: "focus-back", message: pick(text().bubble.focusBack), autoDismissMs: 1800 });
-    setTimeout(() => {
-      if (focusActive && !blockingMode) hideBubble();
-    }, 1900);
     return;
   }
   if (actionId === "focus:end") {
@@ -1046,7 +921,6 @@ app.whenReady().then(() => {
   createPetWindow();
   createTray();
   scheduleReminderTimers();
-  scheduleDistractionDetection();
   if (IS_DEV) {
     createSettingsWindow();
   }
@@ -1064,8 +938,6 @@ app.on("before-quit", () => {
     breakTimer,
     hydrationTimer,
     focusTimer,
-    distractionTimer,
-    distractionStartupTimer,
     bubbleTimer,
     dragTimer,
     dragSafetyTimer

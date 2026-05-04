@@ -1,7 +1,7 @@
 {
-  "name": "pawpal",
-  "version": "0.1.3",
-  "description": "A tiny desktop dog that helps you pause before you burn out.",
+  "name": "deskpet",
+  "version": "0.1.0-m1",
+  "description": "A safe local desktop pet shell for Windows reminders and manual focus timing.",
   "author": "zebangeth",
   "license": "MIT",
   "type": "module",
@@ -10,13 +10,15 @@
     "dev": "electron-vite dev",
     "build": "pnpm typecheck && electron-vite build",
     "typecheck": "tsc --noEmit",
-    "dist": "pnpm build && electron-builder --mac --win",
+    "smoke:m1": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-m1.ps1",
+    "dist": "pnpm dist:win",
     "dist:mac": "pnpm build && electron-builder --mac",
-    "dist:win": "pnpm build && electron-builder --win"
+    "dist:win": "pnpm build && electron-builder --win",
+    "dist:win:installer": "pnpm build && electron-builder --win nsis"
   },
   "build": {
-    "appId": "com.pawpal.app",
-    "productName": "PawPal",
+    "appId": "com.deskpet.app",
+    "productName": "DeskPet",
     "mac": {
       "category": "public.app-category.productivity",
       "target": [
@@ -29,17 +31,25 @@
       "notarize": true
     },
     "win": {
+      "signAndEditExecutable": false,
       "target": [
-        { "target": "nsis", "arch": ["x64"] }
+        { "target": "portable", "arch": ["x64"] },
+        { "target": "zip", "arch": ["x64"] }
       ],
       "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "perMachine": false,
+      "allowElevation": false,
+      "packElevateHelper": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false
     },
     "dmg": {
-      "title": "PawPal",
+      "title": "DeskPet",
       "contents": [
         { "x": 130, "y": 220 },
         { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
@@ -55,7 +65,13 @@
       {
         "from": "pet_assets",
         "to": "pet_assets",
-        "filter": ["**/*", "!.DS_Store"]
+        "filter": [
+          "**/*",
+          "!.DS_Store",
+          "!**/focusAlert/**",
+          "!main_pixel_avatar/**",
+          "!paired_pixel_avatar/**"
+        ]
       }
     ]
   },

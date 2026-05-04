@@ -55,7 +55,7 @@ export function PetView(): JSX.Element {
   }, []);
 
   const state = snapshot.petState;
-  const altText = `PawPal ${state}`;
+  const altText = `DeskPet ${state}`;
   const facingClass = snapshot.petFacing === "left" ? "facing-left" : "facing-right";
   const appearanceId = snapshot.settings.petAppearanceId;
   const asset = getPetAsset(appearanceId, state, assetVariant, assetReplayKey);
@@ -142,7 +142,7 @@ export function PetView(): JSX.Element {
   return (
     <main
       className="pet-shell"
-      aria-label="PawPal desktop pet"
+      aria-label="DeskPet desktop pet"
       onContextMenu={(event) => {
         event.preventDefault();
         window.pawpal.petContextMenu();
