@@ -4,6 +4,7 @@ import { i18n, resolveLanguage } from "../../../shared/i18n";
 import type { PetState, SpeechBubble } from "../../../shared/types";
 import { getPetAsset, getPetAssetVariantCount } from "../assets";
 import { useNow, useSnapshot } from "../hooks";
+import { pointInElementHitbox } from "../petHitbox";
 
 type DragRef = {
   pointerId: number;
@@ -15,8 +16,8 @@ type DragRef = {
 const CONTINUOUS_ASSET_STATES = new Set<PetState>(["idle", "focusGuard"]);
 const CONTINUOUS_ASSET_ROTATION_MS = 15 * 60 * 1000;
 const DRAG_START_DISTANCE_PX = 10;
-const PET_INTERACTIVE_SELECTOR = ".pet-button";
-const BUBBLE_INTERACTIVE_SELECTOR = ".pet-button, .speech-bubble";
+const PET_BUTTON_SELECTOR = ".pet-button";
+const BUBBLE_INTERACTIVE_SELECTOR = ".speech-bubble";
 
 function randomVariant(count: number, previous?: number): number {
   if (count <= 1) return 0;
@@ -83,16 +84,28 @@ export function PetView(): JSX.Element {
   }
 
   function updateMouseInteractivity(point: { x: number; y: number } | null): void {
+    if (dragRef.current) {
+      setMouseInteractive(true);
+      return;
+    }
+
     if (!point) {
       setMouseInteractive(false);
       return;
     }
 
     const target = document.elementFromPoint(point.x, point.y);
-    const selector = bubbleVisibleRef.current
-      ? BUBBLE_INTERACTIVE_SELECTOR
-      : PET_INTERACTIVE_SELECTOR;
-    setMouseInteractive(target instanceof Element && Boolean(target.closest(selector)));
+    if (!(target instanceof Element)) {
+      setMouseInteractive(false);
+      return;
+    }
+
+    const petButton = target.closest(PET_BUTTON_SELECTOR);
+    const isOnPet = petButton ? pointInElementHitbox(point, petButton) : false;
+    const isOnBubble =
+      bubbleVisibleRef.current && Boolean(target.closest(BUBBLE_INTERACTIVE_SELECTOR));
+
+    setMouseInteractive(isOnPet || isOnBubble);
   }
 
   useEffect(() => {
