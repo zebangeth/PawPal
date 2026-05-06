@@ -123,6 +123,7 @@ let breakRunFormatter: ((seconds: number) => string) | null = null;
 let nextBreakRunTurnAt = 0;
 let breakMutedToday = false;
 let dragOffset: PetPosition = { x: 0, y: 0 };
+let petMouseInteractive = true;
 let distractionStatus: DistractionStatus = {
   state: "idle",
   activeApp: "",
@@ -133,6 +134,12 @@ let distractionStatus: DistractionStatus = {
   error: null
 };
 let updateCheck: UpdateCheckResult = createInitialUpdateCheck();
+
+function setPetMouseInteractive(interactive: boolean): void {
+  if (!petWindow || petWindow.isDestroyed() || petMouseInteractive === interactive) return;
+  petMouseInteractive = interactive;
+  petWindow.setIgnoreMouseEvents(!interactive, { forward: true });
+}
 
 function getSettings(): Settings {
   return getStoredSettings(store);
@@ -316,6 +323,7 @@ function registerDisplayChangeHandlers(): void {
 
 function createPetWindow(): void {
   const bounds = initialPetBounds();
+  petMouseInteractive = true;
   petWindow = new BrowserWindow({
     width: PET_WINDOW.width,
     height: PET_WINDOW.height,
@@ -343,6 +351,7 @@ function createPetWindow(): void {
   if (process.platform === "darwin") {
     petWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   }
+  setPetMouseInteractive(false);
   loadRenderer(petWindow, "pet");
   petWindow.once("ready-to-show", () => {
     petWindow?.showInactive();
@@ -1024,6 +1033,9 @@ function registerIpc(): void {
     startPetDrag(offset)
   );
   ipcMain.on("pet:drag-stop", stopPetDrag);
+  ipcMain.on("pet:set-mouse-interactive", (_event, interactive: boolean) => {
+    setPetMouseInteractive(interactive);
+  });
   ipcMain.on("bubble:action", (_event, actionId: string) => handleBubbleAction(actionId));
   ipcMain.on("settings:update", (_event, partial: Partial<Settings>) => {
     setSettings({ ...getSettings(), ...partial });

@@ -15,6 +15,8 @@ type DragRef = {
 const CONTINUOUS_ASSET_STATES = new Set<PetState>(["idle", "focusGuard"]);
 const CONTINUOUS_ASSET_ROTATION_MS = 15 * 60 * 1000;
 const DRAG_START_DISTANCE_PX = 10;
+const PET_INTERACTIVE_SELECTOR = ".pet-button";
+const BUBBLE_INTERACTIVE_SELECTOR = ".pet-button, .speech-bubble";
 
 function randomVariant(count: number, previous?: number): number {
   if (count <= 1) return 0;
@@ -41,6 +43,9 @@ export function PetView(): JSX.Element {
   const [assetReplayKey, setAssetReplayKey] = useState(0);
   const [stateSignal, setStateSignal] = useState(0);
   const dragRef = useRef<DragRef | null>(null);
+  const mouseInteractiveRef = useRef<boolean | null>(null);
+  const lastMousePointRef = useRef<{ x: number; y: number } | null>(null);
+  const bubbleVisibleRef = useRef(false);
   const labels = i18n(resolveLanguage(snapshot.settings.language)).settings;
 
   useEffect(() => {
@@ -71,6 +76,25 @@ export function PetView(): JSX.Element {
     if (clicked) window.pawpal.petClicked();
   }
 
+  function setMouseInteractive(interactive: boolean): void {
+    if (mouseInteractiveRef.current === interactive) return;
+    mouseInteractiveRef.current = interactive;
+    window.pawpal.setMouseInteractive(interactive);
+  }
+
+  function updateMouseInteractivity(point: { x: number; y: number } | null): void {
+    if (!point) {
+      setMouseInteractive(false);
+      return;
+    }
+
+    const target = document.elementFromPoint(point.x, point.y);
+    const selector = bubbleVisibleRef.current
+      ? BUBBLE_INTERACTIVE_SELECTOR
+      : PET_INTERACTIVE_SELECTOR;
+    setMouseInteractive(target instanceof Element && Boolean(target.closest(selector)));
+  }
+
   useEffect(() => {
     const variantCount = getPetAssetVariantCount(appearanceId, state);
     setAssetVariant(randomVariant(variantCount));
@@ -92,15 +116,36 @@ export function PetView(): JSX.Element {
 
   useEffect(() => {
     const cancelActiveDrag = (): void => finishPointerDrag(false);
+    const trackMouse = (event: MouseEvent): void => {
+      const point = { x: event.clientX, y: event.clientY };
+      lastMousePointRef.current = point;
+      updateMouseInteractivity(point);
+    };
+    const clearMouse = (): void => {
+      lastMousePointRef.current = null;
+      updateMouseInteractivity(null);
+    };
+
+    setMouseInteractive(false);
+    window.addEventListener("mousemove", trackMouse);
+    window.addEventListener("mouseleave", clearMouse);
     window.addEventListener("pointerup", cancelActiveDrag);
     window.addEventListener("pointercancel", cancelActiveDrag);
     window.addEventListener("blur", cancelActiveDrag);
     return () => {
+      window.removeEventListener("mousemove", trackMouse);
+      window.removeEventListener("mouseleave", clearMouse);
       window.removeEventListener("pointerup", cancelActiveDrag);
       window.removeEventListener("pointercancel", cancelActiveDrag);
       window.removeEventListener("blur", cancelActiveDrag);
+      window.pawpal.setMouseInteractive(true);
     };
   }, []);
+
+  useEffect(() => {
+    bubbleVisibleRef.current = Boolean(bubble);
+    updateMouseInteractivity(lastMousePointRef.current);
+  }, [bubble]);
 
   function startPointer(event: PointerEvent<HTMLButtonElement>): void {
     if (event.button !== 0) return;
