@@ -80,6 +80,30 @@ function NumberControl({
   unit: string;
   onChange: (next: number) => void;
 }): JSX.Element {
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  function commitDraft(raw: string): void {
+    const next = Number(raw);
+    if (!Number.isFinite(next)) {
+      setDraft(String(value));
+      return;
+    }
+
+    const normalized = Math.min(max, Math.max(min, Math.round(next)));
+    setDraft(String(normalized));
+    onChange(normalized);
+  }
+
+  function step(next: number): void {
+    const normalized = Math.min(max, Math.max(min, next));
+    setDraft(String(normalized));
+    onChange(normalized);
+  }
+
   return (
     <div className="pref-stepper">
       <button
@@ -87,7 +111,7 @@ function NumberControl({
         className="pref-stepper__btn"
         aria-label="−"
         disabled={value <= min}
-        onClick={() => onChange(Math.max(min, value - 1))}
+        onClick={() => step(value - 1)}
       >
         −
       </button>
@@ -95,10 +119,21 @@ function NumberControl({
         type="number"
         min={min}
         max={max}
-        value={value}
+        value={draft}
         onChange={(event) => {
-          const next = Number(event.target.value);
-          if (Number.isFinite(next)) onChange(Math.min(max, Math.max(min, next)));
+          const nextDraft = event.target.value;
+          setDraft(nextDraft);
+
+          const next = Number(nextDraft);
+          if (Number.isFinite(next) && next >= min && next <= max) {
+            onChange(Math.round(next));
+          }
+        }}
+        onBlur={() => commitDraft(draft)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.currentTarget.blur();
+          }
         }}
       />
       <span className="pref-stepper__unit">{unit}</span>
@@ -107,7 +142,7 @@ function NumberControl({
         className="pref-stepper__btn"
         aria-label="+"
         disabled={value >= max}
-        onClick={() => onChange(Math.min(max, value + 1))}
+        onClick={() => step(value + 1)}
       >
         +
       </button>
