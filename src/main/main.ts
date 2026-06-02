@@ -80,6 +80,7 @@ type StoreSchema = {
   stats: TodayStats;
   statsHistory: StatsHistory;
   petPosition?: SavedWindowPosition;
+  petHiddenByUser?: boolean;
 };
 
 type PetPosition = {
@@ -251,6 +252,16 @@ function snapshot(): AppSnapshot {
   };
 }
 
+function isPetHiddenByUser(): boolean {
+  return store.get("petHiddenByUser") === true;
+}
+
+function setPetHiddenByUser(hidden: boolean): void {
+  store.set("petHiddenByUser", hidden);
+  updateTrayMenu();
+  publishSnapshot();
+}
+
 function sendToPet<T>(channel: string, payload?: T): void {
   if (!petWindow || petWindow.isDestroyed()) return;
   petWindow.webContents.send(channel, payload);
@@ -398,7 +409,7 @@ function createPetWindow(): void {
   setPetMouseInteractive(false);
   loadRenderer(petWindow, "pet");
   petWindow.once("ready-to-show", () => {
-    petWindow?.showInactive();
+    if (!isPetHiddenByUser()) petWindow?.showInactive();
     updateTrayMenu();
     publishSnapshot();
   });
@@ -419,11 +430,22 @@ function createPetWindow(): void {
   });
 }
 
-function ensurePetWindowVisible(): void {
+function ensurePetWindowVisible(options: { ignoreUserHidden?: boolean } = {}): boolean {
+  if (isPetHiddenByUser() && !options.ignoreUserHidden) {
+    updateTrayMenu();
+    publishSnapshot();
+    return false;
+  }
   if (!petWindow || petWindow.isDestroyed()) createPetWindow();
   if (petWindow && !petWindow.isVisible()) petWindow.showInactive();
   updateTrayMenu();
   publishSnapshot();
+  return true;
+}
+
+function showPetWindowFromMenu(): void {
+  setPetHiddenByUser(false);
+  ensurePetWindowVisible({ ignoreUserHidden: true });
 }
 
 function createSettingsWindow(): void {
@@ -479,13 +501,12 @@ function createTray(): void {
 function togglePetWindowVisibility(): void {
   if (!petWindow) createPetWindow();
   if (!petWindow) return;
-  if (petWindow.isVisible()) petWindow.hide();
-  else petWindow.showInactive();
-  updateTrayMenu();
-  sendToAll("app:snapshot", snapshot());
+  if (petWindow.isVisible()) hidePetWindowFromMenu();
+  else showPetWindowFromMenu();
 }
 
 function hidePetWindowFromMenu(): void {
+  setPetHiddenByUser(true);
   petWindow?.hide();
   updateTrayMenu();
   sendToAll("app:snapshot", snapshot());
