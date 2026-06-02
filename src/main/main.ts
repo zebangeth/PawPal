@@ -669,11 +669,12 @@ function finishBreakRun(): void {
   hideBubble();
   showBubble({ id: "break-run-complete", message: pick(text().bubble.breakRunComplete), autoDismissMs: 2200 });
   setPetState("breakDone");
+  scheduleBreakReminderTimer();
   setTimeout(() => {
     if (!blockingMode && !focusActive) {
+      if (showOverdueReminder()) return;
       hideBubble();
       setPetState("idle");
-      scheduleReminderTimers();
     }
   }, 2300);
   publishSnapshot();
@@ -698,28 +699,75 @@ function startBreakRun(): void {
   publishSnapshot();
 }
 
+function clearBreakReminderTimer(): void {
+  if (breakTimer) {
+    clearTimeout(breakTimer);
+    breakTimer = null;
+  }
+}
+
+function clearHydrationReminderTimer(): void {
+  if (hydrationTimer) {
+    clearTimeout(hydrationTimer);
+    hydrationTimer = null;
+  }
+}
+
+function scheduleBreakReminderTimer(delayMs?: number): void {
+  clearBreakReminderTimer();
+  const settings = getSettings();
+  if (!settings.breakReminderEnabled || breakMutedToday) {
+    breakDueAt = null;
+    publishSnapshot();
+    return;
+  }
+
+  const nextDelayMs = delayMs ?? settings.breakIntervalMinutes * 60 * 1000;
+  breakDueAt = Date.now() + nextDelayMs;
+  breakTimer = setTimeout(() => triggerBreakReminder(false), nextDelayMs);
+  publishSnapshot();
+}
+
+function scheduleHydrationReminderTimer(delayMs?: number): void {
+  clearHydrationReminderTimer();
+  const settings = getSettings();
+  if (!settings.hydrationReminderEnabled) {
+    hydrationDueAt = null;
+    publishSnapshot();
+    return;
+  }
+
+  const nextDelayMs = delayMs ?? settings.hydrationIntervalMinutes * 60 * 1000;
+  hydrationDueAt = Date.now() + nextDelayMs;
+  hydrationTimer = setTimeout(() => triggerHydrationReminder(false), nextDelayMs);
+  publishSnapshot();
+}
+
 function scheduleReminderTimers(): void {
-  if (breakTimer) clearTimeout(breakTimer);
-  if (hydrationTimer) clearTimeout(hydrationTimer);
+  clearBreakReminderTimer();
+  clearHydrationReminderTimer();
   breakDueAt = null;
   hydrationDueAt = null;
 
+  scheduleBreakReminderTimer();
+  scheduleHydrationReminderTimer();
+}
+
+function showOverdueReminder(): boolean {
+  if (blockingMode || focusActive) return false;
+
+  const now = Date.now();
   const settings = getSettings();
-  if (settings.breakReminderEnabled && !breakMutedToday) {
-    breakDueAt = Date.now() + settings.breakIntervalMinutes * 60 * 1000;
-    breakTimer = setTimeout(
-      () => triggerBreakReminder(false),
-      settings.breakIntervalMinutes * 60 * 1000
-    );
+  if (settings.breakReminderEnabled && !breakMutedToday && breakDueAt !== null && breakDueAt <= now) {
+    triggerBreakReminder(false);
+    return true;
   }
-  if (settings.hydrationReminderEnabled) {
-    hydrationDueAt = Date.now() + settings.hydrationIntervalMinutes * 60 * 1000;
-    hydrationTimer = setTimeout(
-      () => triggerHydrationReminder(false),
-      settings.hydrationIntervalMinutes * 60 * 1000
-    );
+  if (settings.hydrationReminderEnabled && hydrationDueAt !== null && hydrationDueAt <= now) {
+    triggerHydrationReminder(false);
+    return true;
   }
-  publishSnapshot();
+
+  return false;
 }
 
 function setDistractionStatus(partial: Partial<DistractionStatus>): void {
@@ -802,6 +850,7 @@ function scheduleDistractionDetection(): void {
 function resumeLongTermState(): void {
   blockingMode = null;
   hideBubble();
+  if (showOverdueReminder()) return;
   if (focusActive) {
     setPetState("focusGuard");
     sendToAll("app:snapshot", snapshot());
@@ -863,9 +912,18 @@ async function checkForUpdates(options: { notifyAvailable?: boolean } = {}): Pro
 }
 
 function triggerBreakReminder(fromDemo: boolean): void {
-  if (blockingMode === "focusWarning" || blockingMode === "breakRun") return;
-  if (!fromDemo && (focusActive || breakMutedToday)) {
-    scheduleReminderTimers();
+  if (!fromDemo) {
+    breakTimer = null;
+    if (breakMutedToday) {
+      breakDueAt = null;
+      publishSnapshot();
+      return;
+    }
+    if (blockingMode || focusActive) {
+      publishSnapshot();
+      return;
+    }
+  } else if (blockingMode === "focusWarning" || blockingMode === "breakRun") {
     return;
   }
   ensurePetWindowVisible();
@@ -886,8 +944,13 @@ function triggerBreakReminder(fromDemo: boolean): void {
 }
 
 function triggerHydrationReminder(fromDemo: boolean): void {
-  if (blockingMode || (!fromDemo && focusActive)) {
-    scheduleReminderTimers();
+  if (!fromDemo) {
+    hydrationTimer = null;
+    if (blockingMode || focusActive) {
+      publishSnapshot();
+      return;
+    }
+  } else if (blockingMode) {
     return;
   }
   ensurePetWindowVisible();
@@ -975,6 +1038,7 @@ function stopFocusMode(completed: boolean): void {
   });
   setTimeout(() => {
     if (!focusActive && !blockingMode) {
+      if (showOverdueReminder()) return;
       hideBubble();
       setPetState("idle");
     }
@@ -1008,10 +1072,7 @@ function handleBubbleAction(actionId: string): void {
   }
   if (actionId === "break:snooze") {
     resumeLongTermState();
-    if (breakTimer) clearTimeout(breakTimer);
-    breakDueAt = Date.now() + 10 * 60 * 1000;
-    breakTimer = setTimeout(() => triggerBreakReminder(false), 10 * 60 * 1000);
-    publishSnapshot();
+    scheduleBreakReminderTimer(10 * 60 * 1000);
     return;
   }
   if (actionId === "break:mute") {
@@ -1035,19 +1096,17 @@ function handleBubbleAction(actionId: string): void {
       setPetState("hydrationDone");
       showBubble({ id: "hydration-complete", message: pick(text().bubble.hydrationDone), autoDismissMs: 1800 });
       setTimeout(() => {
+        scheduleHydrationReminderTimer();
+        if (showOverdueReminder()) return;
         hideBubble();
         setPetState(focusActive ? "focusGuard" : "idle");
-        scheduleReminderTimers();
       }, 1900);
     }, 2400);
     return;
   }
   if (actionId === "hydration:snooze") {
     resumeLongTermState();
-    if (hydrationTimer) clearTimeout(hydrationTimer);
-    hydrationDueAt = Date.now() + 15 * 60 * 1000;
-    hydrationTimer = setTimeout(() => triggerHydrationReminder(false), 15 * 60 * 1000);
-    publishSnapshot();
+    scheduleHydrationReminderTimer(15 * 60 * 1000);
     return;
   }
   if (actionId === "focus:back") {
